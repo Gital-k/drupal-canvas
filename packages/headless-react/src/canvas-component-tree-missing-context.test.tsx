@@ -4,7 +4,7 @@ import {
   useJsonApiClient,
   usePageContext,
   useSiteContext,
-} from 'drupal-canvas';
+} from 'drupal-canvas/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

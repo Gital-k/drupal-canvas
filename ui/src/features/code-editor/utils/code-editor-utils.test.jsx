@@ -817,7 +817,7 @@ describe('getDataDependenciesFromAst', () => {
 
   it('combines date and context imports without duplicate settings', () => {
     const ast = parse(
-      `import { canvasFormatDate as format, useSiteContext } from 'drupal-canvas';
+      `import { canvasFormatDate as format } from 'drupal-canvas'; import { useSiteContext } from 'drupal-canvas/react';
        import * as canvas from 'drupal-canvas';
        canvas.canvasFormatTime('14:30:00');`,
       { sourceType: 'module' },
@@ -849,7 +849,7 @@ describe('getDataDependenciesFromAst', () => {
 
   it('should detect needed drupalSettings for members of namespace imports', () => {
     const code = `
-      import * as canvas from 'drupal-canvas';
+      import * as canvas from 'drupal-canvas/react';
       import * as utils from 'drupal-canvas/drupal-utils';
 
       export default function Title() {
@@ -874,11 +874,7 @@ describe('getDataDependenciesFromAst', () => {
   it('should detect needed drupalSettings when using the context hooks', () => {
     const code = `
       import useSWR from 'swr';
-      import {
-        usePageContext as usePage,
-        useSiteContext,
-        useJsonApiClient,
-      } from 'drupal-canvas';
+      import { usePageContext as usePage, useSiteContext, useJsonApiClient } from 'drupal-canvas/react';
     `;
     const ast = parse(code, { sourceType: 'module' });
     const result = getDataDependenciesFromAst(ast);

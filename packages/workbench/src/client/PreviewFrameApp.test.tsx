@@ -1,13 +1,13 @@
 import { act } from 'react';
 import {
-  useJsonApiClient,
-  usePageContext,
-  useSiteContext,
-} from 'drupal-canvas';
-import {
   defineComponentRegistry,
   renderSpec,
 } from 'drupal-canvas/json-render-utils';
+import {
+  useJsonApiClient,
+  usePageContext,
+  useSiteContext,
+} from 'drupal-canvas/react';
 import { createRoot } from 'react-dom/client';
 import { MemoryRouter } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

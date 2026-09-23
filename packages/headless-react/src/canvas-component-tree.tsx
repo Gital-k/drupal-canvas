@@ -1,10 +1,10 @@
 import { createElement, useMemo } from 'react';
+import { createJsonApiClient } from 'drupal-canvas';
 import {
   CanvasContextProvider,
-  createJsonApiClient,
   JsonApiClientProvider,
   useHasJsonApiClient,
-} from 'drupal-canvas';
+} from 'drupal-canvas/react';
 
 import '@drupal-canvas/headless/preview.css';
 

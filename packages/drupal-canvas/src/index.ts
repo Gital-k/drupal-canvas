@@ -1,10 +1,4 @@
 import {
-  CanvasContextProvider,
-  useHasCanvasContext,
-  usePageContext,
-  useSiteContext,
-} from './context.js';
-import {
   canvasFormatDate,
   canvasFormatDateRange,
   canvasFormatDateTime,
@@ -21,11 +15,6 @@ import {
   sortMenu as sortLinksetMenu,
 } from './drupal-utils.js';
 import FormattedText from './FormattedText.js';
-import {
-  JsonApiClientProvider,
-  useHasJsonApiClient,
-  useJsonApiClient,
-} from './jsonapi-client-context.js';
 import {
   createJsonApiClient,
   DraftSessionError,
@@ -49,12 +38,7 @@ import { cn } from './utils.js';
 
 import type { CanvasDateFormatOptions } from './date-utils.js';
 
-export type {
-  CanvasContext,
-  CanvasContextProviderProps,
-  PageContext,
-  SiteContext,
-} from './context.js';
+export type { CanvasContext, PageContext, SiteContext } from './context.js';
 export type {
   BreadcrumbLink,
   EntityMetadata,
@@ -68,7 +52,6 @@ export type {
   JsonApiClientConfig,
   JsonApiRuntimeConfig,
 } from './jsonapi-client.js';
-export type { JsonApiClientProviderProps } from './jsonapi-client-context.js';
 export type { CanvasDataV0 } from './drupal-settings.js';
 export type { CanvasRuntimeEnvironment } from './runtime.js';
 
@@ -80,17 +63,6 @@ export {
 
   // utils
   cn,
-
-  // Page and site context
-  CanvasContextProvider,
-  usePageContext,
-  useSiteContext,
-  useHasCanvasContext,
-
-  // JSON:API client context
-  JsonApiClientProvider,
-  useJsonApiClient,
-  useHasJsonApiClient,
 
   // Runtime integration (Drupal and Workbench integrations only)
   declareCanvasRuntime,

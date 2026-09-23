@@ -17,7 +17,8 @@ export default function PageTitle() {
 `;
     const result = migrateGetterCalls(source, 'index.jsx');
     expect(result.changed).toBe(true);
-    expect(result.source).toBe(`import { usePageContext } from 'drupal-canvas';
+    expect(result.source)
+      .toBe(`import { usePageContext } from 'drupal-canvas/react';
 
 export default function PageTitle() {
   const { pageTitle } = usePageContext();
@@ -46,7 +47,7 @@ export default Branding;
     const result = migrateGetterCalls(source, 'index.jsx');
     expect(result.changed).toBe(true);
     expect(result.source).toBe(`import { sortMenu } from '@/lib/drupal-utils';
-import { useSiteContext } from 'drupal-canvas';
+import { useSiteContext } from 'drupal-canvas/react';
 
 const Branding = () => {
   const { homeUrl, siteName } = useSiteContext().branding;
@@ -59,12 +60,7 @@ export default Branding;
 
   it.each([
     ['drupal-canvas/drupal-utils', 'sortMenu', 'getPageData', 'getSiteData'],
-    [
-      'drupal-canvas',
-      'usePageContext, useSiteContext',
-      'getPageData',
-      'getSiteData',
-    ],
+    ['drupal-canvas', 'FormattedText, Image', 'getPageData', 'getSiteData'],
     [
       'drupal-canvas/drupal-utils',
       '/* keep this alias */ sortMenu as menu',
@@ -115,7 +111,8 @@ export default function Crumbs() {
 `;
     const result = migrateGetterCalls(source, 'index.tsx');
     expect(result.changed).toBe(true);
-    expect(result.source).toBe(`import { usePageContext } from 'drupal-canvas';
+    expect(result.source)
+      .toBe(`import { usePageContext } from 'drupal-canvas/react';
 
 export default function Crumbs() {
   const data = usePageContext();
@@ -138,7 +135,7 @@ export default function Title() {
     // call with a named import, which the data dependency detection sees.
     expect(result.source).toContain('const page = usePageContext();');
     expect(result.source).toContain(
-      "import { usePageContext } from 'drupal-canvas';",
+      "import { usePageContext } from 'drupal-canvas/react';",
     );
     expect(result.source).toContain("import * as drupal from 'drupal-canvas';");
     expect(result.source).not.toContain('drupal.usePageContext');
@@ -156,13 +153,13 @@ export default function Title() {
     expect(result.changed).toBe(true);
     expect(result.source).toContain('const page = usePageContext();');
     expect(result.source).toContain(
-      "import { usePageContext } from 'drupal-canvas';",
+      "import { usePageContext } from 'drupal-canvas/react';",
     );
     expect(result.source).not.toContain('utils.usePageContext');
   });
 
   it('reuses an existing hook import instead of importing it twice', () => {
-    const source = `import { usePageContext } from 'drupal-canvas';
+    const source = `import { usePageContext } from 'drupal-canvas/react';
 import { getPageData } from '@/lib/drupal-utils';
 
 export default function Title() {
@@ -175,7 +172,7 @@ export default function Title() {
     expect(result.changed).toBe(true);
     expect(result.source.match(/usePageContext/g)).toHaveLength(3);
     expect(result.source).toContain(
-      "import { usePageContext } from 'drupal-canvas';",
+      "import { usePageContext } from 'drupal-canvas/react';",
     );
     expect(result.source).not.toContain('usePageContext, usePageContext');
     expect(result.source).not.toContain('drupal-utils');
@@ -264,7 +261,7 @@ export const B = fr((props, ref) => <h1 ref={ref}>{getPageData().pageTitle}</h1>
   });
 
   it('leaves a file unchanged when the replacement name is shadowed anywhere', () => {
-    const source = `import { usePageContext } from 'drupal-canvas';
+    const source = `import { usePageContext } from 'drupal-canvas/react';
 import { getPageData } from '@/lib/drupal-utils';
 
 export default function Title({ usePageContext }) {
@@ -371,7 +368,7 @@ export default function Related() {
     const result = migrateGetterCalls(source, 'index.jsx');
     expect(result.changed).toBe(true);
     expect(result.source).toContain(
-      "import { usePageContext, useSiteContext, JsonApiClient } from 'drupal-canvas';",
+      "import { JsonApiClient } from 'drupal-canvas';\nimport { usePageContext, useSiteContext } from 'drupal-canvas/react';",
     );
     expect(result.source).toContain('const page = usePageContext();');
     expect(result.source).toContain('const site = useSiteContext();');
