@@ -93,7 +93,7 @@ import { CanvasComponentTree } from '@drupal-canvas/headless-tanstack-start/Canv
 ```
 
 `context` lets registered components read the page and site data through
-`usePageContext()` and `useSiteContext()` from `drupal-canvas`. For
+`usePageContext()` and `useSiteContext()` from `drupal-canvas/react`. For
 `useJsonApiClient()`, read `getJsonApiRuntimeConfig()` in the server function
 the root route's loader calls (alongside the session state) and render
 `JsonApiRuntimeProvider` from `@drupal-canvas/headless-react` around the outlet;

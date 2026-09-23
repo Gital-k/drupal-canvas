@@ -569,7 +569,7 @@ props:
       },
     });
     expect(source).toContain(
-      "import { CanvasContextProvider, JsonApiClientProvider, createJsonApiClient } from 'drupal-canvas';",
+      "import { createJsonApiClient } from 'drupal-canvas'; import { CanvasContextProvider, JsonApiClientProvider } from 'drupal-canvas/react';",
     );
     expect(source).toContain(
       "import canvasSiteData from 'virtual:drupal-canvas/site-data';",

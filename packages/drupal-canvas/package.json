@@ -19,6 +19,11 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./react": {
+      "import": "./dist/react.js",
+      "types": "./dist/react.d.ts",
+      "default": "./dist/react.js"
+    },
     "./json-render-utils": {
       "import": "./dist/json-render-utils.js",
       "types": "./dist/json-render-utils.d.ts",
