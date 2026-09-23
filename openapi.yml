@@ -3424,9 +3424,10 @@ paths:
                         type: boolean
                         description: >-
                           Whether Code Component islands render inside the
-                          shared context providers, so components may use the
+                          shared context providers and the import map exposes
+                          `drupal-canvas/react`, so components may use its
                           `usePageContext()`, `useSiteContext()`, and
-                          `useJsonApiClient()` hooks from `drupal-canvas`.
+                          `useJsonApiClient()` hooks.
         '401':
           $ref: '#/components/responses/UnauthorizedErrorResponse'
         '403':

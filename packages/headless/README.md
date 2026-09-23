@@ -125,10 +125,10 @@ responses make `fetchPage()` return `null`.
 
 ## JSON:API for portable Code Components
 
-Code Components that use `useJsonApiClient()` from `drupal-canvas` fetch Drupal
-content from the browser. The SDK keeps those requests on the application's own
-origin through a JSON:API proxy that the framework adapters mount at
-`/api/canvas/jsonapi` (configurable with `CANVAS_JSONAPI_PROXY_PATH`):
+Code Components that use `useJsonApiClient()` from `drupal-canvas/react` fetch
+Drupal content from the browser. The SDK keeps those requests on the
+application's own origin through a JSON:API proxy that the framework adapters
+mount at `/api/canvas/jsonapi` (configurable with `CANVAS_JSONAPI_PROXY_PATH`):
 
 ```text
 Code Component → shared browser client → application proxy → Drupal

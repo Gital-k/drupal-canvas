@@ -16,13 +16,15 @@
  */
 
 import {
-  CanvasContextProvider,
   createJsonApiClient,
   drupalSettingsToCanvasContext,
   drupalSettingsToJsonApiRuntimeConfig,
-  JsonApiClientProvider,
   readCanvasDataV0,
 } from 'drupal-canvas';
+import {
+  CanvasContextProvider,
+  JsonApiClientProvider,
+} from 'drupal-canvas/react';
 import { h } from 'preact';
 import { useEffect, useReducer } from 'preact/hooks';
 import preactRenderer from '@astrojs/preact/client.js';

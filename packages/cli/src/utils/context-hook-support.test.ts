@@ -35,7 +35,7 @@ async function writePackage(
   },
   manifest: Record<string, unknown> = {
     exports: {
-      '.': {
+      './react': {
         import: './dist/index.js',
         types: './dist/index.d.ts',
         default: './dist/index.js',
@@ -72,55 +72,73 @@ describe('context hook support', () => {
     await fs.rm(root, { recursive: true, force: true });
   });
 
-  it('resolves the root runtime entry under the import conditions', () => {
+  it('rejects a root-only package even when its hooks exist', async () => {
+    await writePackage(root, '99.0.0', undefined, {
+      exports: { '.': './dist/index.js' },
+    });
+    expect((await checkInstalledPackage(root)).ok).toBe(false);
+    const support = await evaluateContextHookSupport({
+      siteUrl: 'https://example.test',
+      projectRoot: root,
+      fetchSiteData: async () => ({ capabilities: { contextHooks: true } }),
+    });
+    expect(support.supported).toBe(false);
+    expect(support.reasons.join(' ')).toContain('drupal-canvas/react');
+  });
+
+  it('resolves the React runtime entry under the import conditions', () => {
     expect(
       resolveRuntimeEntry({
-        exports: { '.': { import: './dist/index.js', default: './dist/x.js' } },
+        exports: {
+          './react': { import: './dist/index.js', default: './dist/x.js' },
+        },
       }),
     ).toBe('./dist/index.js');
     expect(
       resolveRuntimeEntry({
         exports: {
-          '.': { import: { types: './t.d.ts', default: './dist/esm.js' } },
+          './react': {
+            import: { types: './t.d.ts', default: './dist/esm.js' },
+          },
         },
       }),
     ).toBe('./dist/esm.js');
-    expect(resolveRuntimeEntry({ exports: './dist/only.js' })).toBe(
-      './dist/only.js',
-    );
+    expect(resolveRuntimeEntry({ exports: './dist/only.js' })).toBe(null);
     expect(resolveRuntimeEntry({ module: './m.js', main: './c.js' })).toBe(
-      './m.js',
+      null,
     );
     expect(
-      resolveRuntimeEntry({ exports: { '.': { types: './t.d.ts' } } }),
+      resolveRuntimeEntry({ exports: { './react': { types: './t.d.ts' } } }),
     ).toBe(null);
   });
 
-  it('respects condition order and a terminal denial of the root subpath', () => {
+  it('respects condition order and a terminal denial of the React subpath', () => {
     // A null target for a matching condition denies the subpath; a later
     // condition is not a fallback.
     expect(
       resolveRuntimeEntry({
-        exports: { '.': { default: null, import: './hooks.js' } },
+        exports: { './react': { default: null, import: './hooks.js' } },
       }),
     ).toBe(null);
     expect(
       resolveRuntimeEntry({
-        exports: { '.': { import: null, default: './hooks.js' } },
+        exports: { './react': { import: null, default: './hooks.js' } },
       }),
     ).toBe(null);
-    expect(resolveRuntimeEntry({ exports: { '.': null } })).toBe(null);
+    expect(resolveRuntimeEntry({ exports: { './react': null } })).toBe(null);
     // Object order decides between supported conditions.
     expect(
       resolveRuntimeEntry({
-        exports: { '.': { default: './default.js', import: './import.js' } },
+        exports: {
+          './react': { default: './default.js', import: './import.js' },
+        },
       }),
     ).toBe('./default.js');
     // Unsupported conditions are skipped, in order.
     expect(
       resolveRuntimeEntry({
         exports: {
-          '.': {
+          './react': {
             require: './cjs.js',
             node: { import: './node.js' },
             import: './import.js',
@@ -131,7 +149,9 @@ describe('context hook support', () => {
     // A nested object without a match continues to the next condition.
     expect(
       resolveRuntimeEntry({
-        exports: { '.': { import: { require: './x.js' }, default: './d.js' } },
+        exports: {
+          './react': { import: { require: './x.js' }, default: './d.js' },
+        },
       }),
     ).toBe('./d.js');
   });
@@ -316,7 +336,7 @@ export { type useSiteContext } from "./types";
         'src/types.ts':
           'export const usePageContext = 1;\nexport const useSiteContext = 1;\n',
       },
-      { exports: { '.': { import: './src/index.ts' } } },
+      { exports: { './react': { import: './src/index.ts' } } },
     );
     expect((await checkInstalledPackage(root)).reason).toContain(
       'does not export',
@@ -364,10 +384,10 @@ export { type useSiteContext } from "./types";
       root,
       '0.6.0',
       { 'dist/index.js': BUILT_ENTRY },
-      { exports: { '.': { types: './dist/index.d.ts' } } },
+      { exports: { './react': { types: './dist/index.d.ts' } } },
     );
     expect((await checkInstalledPackage(root)).reason).toContain(
-      'declares no root entry',
+      'declares no `drupal-canvas/react` entry',
     );
   });
 

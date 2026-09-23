@@ -9,7 +9,7 @@
  */
 
 import { act } from 'react';
-import { useJsonApiClient } from 'drupal-canvas';
+import { useJsonApiClient } from 'drupal-canvas/react';
 import { hydrateRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import useSWR, { SWRConfig } from 'swr';
