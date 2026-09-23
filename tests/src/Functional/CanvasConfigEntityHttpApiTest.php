@@ -2851,7 +2851,9 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // the anonymous user: an unpublished node the current user owns and may
     // view is a valid preview entity even though anonymous users cannot see it.
     \assert($this->loggedInUser instanceof UserInterface);
-    $this->loggedInUser->addRole($this->drupalCreateRole(['view own unpublished content']))->save();
+    $rid = $this->drupalCreateRole(['view own unpublished content']);
+    \assert(\is_string($rid));
+    $this->loggedInUser->addRole($rid)->save();
     $unpublished_node = Node::create([
       'type' => 'llama',
       'title' => 'Unpublished llama',
