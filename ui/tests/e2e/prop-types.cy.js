@@ -263,11 +263,8 @@ describe('Prop types editing', () => {
   );
 
   it('Date + Time widget', { retries: { openMode: 0, runMode: 3 } }, () => {
-    // @todo these tests confirm that the date+time inputs can be changed and the
-    // preview updates in response. It is not yet confirmed if the values found
-    // in the form and preview are *correct*. This may require time zone/locale
-    // adjustments - do not interpret the presence of this test as evidence that
-    // time zone offsets are working as they should.
+    // The form shows date+time values in the user's timezone (the test site's
+    // default: Australia/Sydney), the component receives them in UTC.
     const dateSelector =
       '[name$="[test_string_format_date_time][0][value][date]"]';
     const timeSelector =
@@ -277,12 +274,15 @@ describe('Prop types editing', () => {
       'exist',
     );
 
-    cy.get(dateSelector).should('have.value', '2016-09-16');
+    // The example value is 2016-09-16T20:20:39+00:00. The form shows it in the
+    // user's timezone (Australia/Sydney, UTC+10 in September): the next day.
+    cy.get(dateSelector).should('have.value', '2016-09-17');
 
-    cy.get(timeSelector).should('have.value', '20:20:39');
+    cy.get(timeSelector).should('have.value', '06:20:39');
     cy.testInIframe('#test-string-format-date-time', (el) =>
       el.scrollIntoView(),
     );
+    // The component receives the example value unchanged, in UTC.
     cy.waitForElementContentInIframe(
       '#test-string-format-date-time',
       '2016-09-16T20:20:39+00:00',
@@ -299,9 +299,10 @@ describe('Prop types editing', () => {
     cy.get(dateSelector).should('have.value', '2017-06-28');
     cy.get(timeSelector).should('have.value', '19:21:35');
 
+    // The entered value is stored, and passed to the component, in UTC.
     cy.waitForElementContentInIframe(
       '#test-string-format-date-time',
-      '2017-06-28T19:21:35.000Z',
+      '2017-06-28T09:21:35Z',
     );
   });
 

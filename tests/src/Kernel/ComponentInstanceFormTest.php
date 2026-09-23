@@ -16,13 +16,16 @@ use Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponent;
 use Drupal\canvas\PropExpressions\StructuredData\Evaluator;
 use Drupal\canvas\PropExpressions\StructuredData\NegotiatedLanguage;
 use Drupal\canvas\PropExpressions\StructuredData\StructuredDataPropExpression;
+use Drupal\canvas\PropShape\PropShape;
 use Drupal\canvas\PropShape\PropShapeRepositoryInterface;
 use Drupal\Core\Block\BlockManagerInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Datetime\Element\Datetime;
 use Drupal\Core\Extension\ModuleInstallerInterface;
 use Drupal\Core\Extension\ThemeInstallerInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\FormState;
+use Drupal\Core\Render\ElementInfoManagerInterface;
 use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\Traits\CiModulePathTrait;
 use Drupal\Tests\canvas\TestSite\CanvasTestSetup;
@@ -677,6 +680,40 @@ final class ComponentInstanceFormTest extends ApiLayoutControllerTestBase {
     $form_state_ci->setFormObject(new StubForm(ComponentInstanceForm::FORM_ID, $form_ci));
     $rendered_form_ci = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget_for_ci, 'some-prop-name', FALSE, User::create([]), $form_ci, $form_state_ci);
     $this->assertSame('some-prop-name', $rendered_form_ci['#component_prop_name']);
+  }
+
+  /**
+   * Tests the datetime widget shows stored values in the user's timezone.
+   *
+   * @see \Drupal\canvas\PropSource\StaticPropSource::formTemporaryRemoveThisExclamationExclamationExclamation()
+   */
+  #[TestWith(['date-time', '2025-12-31T13:30:00', '2026-01-01', '00:30:00'], 'stored in UTC, next year in the user timezone')]
+  #[TestWith(['date-time', '2026-01-01T00:30:00.000Z', '2026-01-01', '11:30:00'], 'stored with an explicit offset')]
+  #[TestWith(['date', '2025-12-31', '2025-12-31', ''], 'date only, no timezone conversion')]
+  public function testDateTimeWidgetShowsValuesInUserTimezone(string $format, string $stored_value, string $expected_date, string $expected_time): void {
+    // A site default timezone that differs from the user's proves the user's
+    // timezone is used. Around New Year's Eve, Australia/Sydney observes
+    // daylight saving time (UTC+11): UTC values cross the day, month and year
+    // boundaries when converted to local time.
+    $this->config('system.date')->set('timezone.default', 'UTC')->save();
+    $this->setUpCurrentUser(['timezone' => 'Australia/Sydney']);
+
+    $storable_prop_shape = $this->container->get(PropShapeRepositoryInterface::class)
+      ->getStorablePropShape(new PropShape(['type' => 'string', 'format' => $format]));
+    $this->assertNotNull($storable_prop_shape);
+    $this->assertSame('datetime_default', $storable_prop_shape->fieldWidget);
+    $prop_source = $storable_prop_shape->toStaticPropSource()->withValue($stored_value);
+    $widget = $prop_source->getWidget('irrelevant-for-this-test', 'irrelevant-for-this-test', 'some-prop-name', $this->randomString(), $storable_prop_shape->fieldWidget);
+    $form = ['#parents' => [$this->randomMachineName()]];
+    $form_state = new FormState();
+    $form_state->setFormObject(new StubForm('some_id', $form));
+    $rendered_form = $prop_source->formTemporaryRemoveThisExclamationExclamationExclamation($widget, 'some-prop-name', FALSE, User::create([]), $form, $form_state);
+
+    // Compute the values the date and time inputs are rendered with.
+    $element = $rendered_form['widget'][0]['value'] + $this->container->get(ElementInfoManagerInterface::class)->getInfo('datetime');
+    $value = Datetime::valueCallback($element, FALSE, $form_state);
+    $this->assertSame($expected_date, $value['date']);
+    $this->assertSame($expected_time, $value['time']);
   }
 
 }

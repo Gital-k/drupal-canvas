@@ -353,14 +353,11 @@ const dateTime: Transformer<
       return null;
     }
 
-    try {
-      return new Date(`${dateString} ${timeString}+0000`).toISOString();
-    } catch (e) {
-      return null;
-    }
-
-    // @todo Update this in https://www.drupal.org/project/canvas/issues/3501281, which will allow removing the FE-special casing in \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
-    return new Date(`${dateString} ${timeString}+0000`).toISOString();
+    // Send the wall-clock time as entered, without a timezone offset: the
+    // server interprets it in the current user's Drupal timezone and converts
+    // it to UTC for storage, like the datetime widget does on entity forms.
+    // @see \Drupal\canvas\PropSource\StaticPropSource::convertLocalDateTimeToUtc()
+    return `${dateString} ${timeString}`;
   });
   if (options.multiple) {
     return returnValue.filter(Boolean);
