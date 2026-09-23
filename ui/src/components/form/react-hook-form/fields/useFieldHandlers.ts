@@ -152,8 +152,10 @@ export function useFieldHandlers<
         dispatch: latest.dispatch,
         formId: latest.formContext?.formId,
         fieldName,
-        validateNewValue: (e: ReactType.ChangeEvent, newValue: any) =>
-          validateNewValue(e, newValue, latest),
+        validateNewValue: (e: ReactType.ChangeEvent) => {
+          const target = e.target as HTMLInputElement;
+          return validateNewValue(e, target.value, latest)
+        },
         errorsText,
       });
       handler(e);
