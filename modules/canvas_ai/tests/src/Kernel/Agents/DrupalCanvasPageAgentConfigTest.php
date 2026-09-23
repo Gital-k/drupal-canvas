@@ -86,11 +86,9 @@ final class DrupalCanvasPageAgentConfigTest extends CanvasKernelTestBase {
       $this->assertEmpty($agent->get('tool_settings')[$tool_id]['restrict_multiple_calls']);
     }
 
-    // Both information tools feed the system prompt on every hop. Neither is
-    // limited to a loop: a tool limited that way runs only on the hops it
-    // lists, and its result is appended to the chat history as a user message
-    // instead, which a history kept across turns would repeat on every turn.
-    // @see \Drupal\ai_agents\PluginBase\AiAgentEntityWrapper::getDefaultInformationTools()
+    // Both `get_component_context` and `get_current_layout` tools are marked as
+    // default information tools, and neither has `available_on_loop`
+    // configured.
     $information_tools = Yaml::parse($agent->get('default_information_tools'));
     $catalog = $information_tools['available_components'];
     $this->assertSame('canvas_ai:get_component_context', $catalog['tool']);
