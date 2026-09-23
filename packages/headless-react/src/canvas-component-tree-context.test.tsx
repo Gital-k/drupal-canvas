@@ -1,13 +1,13 @@
 // @vitest-environment jsdom
 
+import { createJsonApiClient } from 'drupal-canvas';
 import {
   CanvasContextProvider,
-  createJsonApiClient,
   JsonApiClientProvider,
   useJsonApiClient,
   usePageContext,
   useSiteContext,
-} from 'drupal-canvas';
+} from 'drupal-canvas/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

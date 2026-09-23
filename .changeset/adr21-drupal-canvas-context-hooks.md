@@ -3,7 +3,10 @@
 ---
 
 Add the shared runtime APIs for React Code Components that run in Drupal and in
-React-based headless frontends.
+React-based headless frontends. New React hooks/providers and their provider
+prop types are exported from `drupal-canvas/react`; existing components and
+utility import paths remain unchanged. Framework-neutral data/client types
+remain at the root.
 
 - `usePageContext()` and `useSiteContext()` replace `getPageData()` and
   `getSiteData()`; `CanvasContextProvider` supplies the values, and the

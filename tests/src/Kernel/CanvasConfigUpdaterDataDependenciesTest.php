@@ -26,7 +26,7 @@ final class CanvasConfigUpdaterDataDependenciesTest extends CanvasKernelTestBase
       ['v0.baseUrl', 'v0.branding', 'v0.breadcrumbs', 'v0.pageTitle'],
     ];
     yield 'context hooks' => [
-      "import { usePageContext, useSiteContext, useJsonApiClient } from 'drupal-canvas';",
+      "import { usePageContext, useSiteContext, useJsonApiClient } from 'drupal-canvas/react';",
       ['v0.baseUrl', 'v0.branding', 'v0.themeAssets', 'v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity', 'v0.jsonapiSettings'],
     ];
     yield 'no data APIs' => [
