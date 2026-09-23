@@ -935,9 +935,7 @@ test.describe('brand kit colors', () => {
     });
 
     // Edit "Brand Red" to pure blue (0, 0, 255).
-    await page.locator(SEL.row('Brand Red')).hover();
-    await page.locator(SEL.rowMenu('Brand Red')).click();
-    await page.locator(SEL.menu.edit).click();
+    await page.locator(SEL.row('Brand Red')).click();
     await expect(page.locator(SEL.form.rgba.r)).toBeVisible();
     await page.locator(SEL.form.rgba.r).fill('0');
     await page.locator(SEL.form.rgba.g).fill('0');
@@ -1029,9 +1027,7 @@ test.describe('brand kit colors', () => {
       });
     });
 
-    await page.locator(SEL.row('Brand Green')).hover();
-    await page.locator(SEL.rowMenu('Brand Green')).click();
-    await page.locator(SEL.menu.edit).click();
+    await page.locator(SEL.row('Brand Green')).click();
     // Brand Green is stored in the HSL color space, so its form opens in HSLA.
     await expect(page.locator(SEL.form.hsla.h)).toBeVisible();
     await page.locator(SEL.form.hsla.h).fill('300');
