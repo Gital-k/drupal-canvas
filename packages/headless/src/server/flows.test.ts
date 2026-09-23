@@ -601,6 +601,24 @@ describe('fetchPage', () => {
   const page = {
     content: { element: 'canvas-page' },
     head: { title: 'Example page' },
+    context: {
+      page: {
+        pageTitle: 'Example page',
+        breadcrumbs: [{ key: '<front>', text: 'Home', url: '/' }],
+        mainEntity: null,
+      },
+      site: {
+        branding: { homeUrl: '/', siteName: 'Example', siteSlogan: '' },
+        baseUrl: 'https://drupal.example',
+        themeAssets: {
+          logo: { url: 'https://drupal.example/sites/default/files/logo.svg' },
+          favicon: {
+            url: 'https://cdn.example/icon.png',
+            mimeType: 'image/png',
+          },
+        },
+      },
+    },
     route: {
       name: 'entity.canvas_page.canonical',
       requestUri: '/example',
@@ -638,6 +656,18 @@ describe('fetchPage', () => {
     const { server } = makeServer(fetchImpl as unknown as typeof fetch);
 
     await expect(server.fetchPage('/example')).resolves.toEqual(emptyPage);
+  });
+
+  it('reports missing context from older sites as null page and site context', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { context, ...legacyPage } = page;
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json(legacyPage));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch);
+
+    await expect(server.fetchPage('/example')).resolves.toEqual({
+      ...legacyPage,
+      context: { page: null, site: null },
+    });
   });
 
   it('returns a configured redirect without draft annotations', async () => {
