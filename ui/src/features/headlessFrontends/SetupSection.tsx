@@ -112,7 +112,7 @@ const SetupSection = ({
         </Text>
         <RadioCards.Root
           size="1"
-          columns={{ initial: '2', sm: '4' }}
+          columns="5"
           value={framework.value}
           onValueChange={(value) => {
             const selected = FRAMEWORKS.find((item) => item.value === value);
