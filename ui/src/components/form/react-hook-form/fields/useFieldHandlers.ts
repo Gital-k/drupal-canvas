@@ -154,7 +154,7 @@ export function useFieldHandlers<
         fieldName,
         validateNewValue: (e: ReactType.ChangeEvent) => {
           const target = e.target as HTMLInputElement;
-          return validateNewValue(e, target.value, latest)
+          return validateNewValue(e, target.value, latest);
         },
         errorsText,
       });
