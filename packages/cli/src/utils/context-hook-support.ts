@@ -2,8 +2,8 @@
  * @file
  * The capability gates for the pull codemod: the connected Drupal site must
  * advertise context-hook support, and the project's installed `drupal-canvas`
- * package must export both hooks as runtime values from its root entry. The
- * package's code is never executed: its root entry is resolved under the
+ * package must export both hooks as runtime values from `drupal-canvas/react`.
+ * The package's code is never executed: the React entry is resolved under the
  * `import` export conditions and parsed statically, following relative
  * re-exports and local aliases inside the package. When either gate cannot be
  * verified, getter calls stay unchanged and the limitation is reported.
@@ -135,11 +135,9 @@ function matchConditions(value: ExportConditions | undefined): ConditionMatch {
 }
 
 /**
- * Resolves the root entry of a package manifest the way an `import` of the
- * package does: the `.` export under the `import` condition, then `default`,
- * in the manifest's own condition order, nested conditions included; else
- * `module`/`main`. Null when the manifest gives no usable entry or denies
- * the root subpath.
+ * Resolves the React subpath under import/default conditions in manifest
+ * order. A root export or module/main entry cannot establish that this
+ * subpath exists; absent, denied or unverifiable React entries fail closed.
  */
 export function resolveRuntimeEntry(manifest: {
   exports?: ExportConditions | { [key: string]: ExportConditions };
@@ -147,18 +145,10 @@ export function resolveRuntimeEntry(manifest: {
   main?: string;
 }): string | null {
   const exports = manifest.exports;
-  if (exports === undefined) {
-    return manifest.module ?? manifest.main ?? null;
+  if (exports === null || typeof exports !== 'object') {
+    return null;
   }
-  const subpaths =
-    exports !== null &&
-    typeof exports === 'object' &&
-    Object.keys(exports).some((key) => key.startsWith('.'))
-      ? (exports as { [key: string]: ExportConditions })
-      : null;
-  const match = matchConditions(
-    subpaths ? subpaths['.'] : (exports as ExportConditions),
-  );
+  const match = matchConditions(exports['./react']);
   return match.kind === 'resolved' ? match.target : null;
 }
 
@@ -597,7 +587,7 @@ const REQUIRED_HOOKS = ['usePageContext', 'useSiteContext'] as const;
 
 /**
  * Checks whether the installed `drupal-canvas` package of a project exports
- * both context hooks as runtime values from its root entry, whatever version
+ * both context hooks as runtime values from its React entry, whatever version
  * it reports. Fails closed: an entry that cannot be resolved or parsed, or
  * exports that cannot be determined statically, count as unsupported.
  */
@@ -630,7 +620,7 @@ export async function checkInstalledPackage(
     return {
       ok: false,
       reason:
-        'the installed `drupal-canvas` package declares no root entry to import',
+        'the installed `drupal-canvas` package declares no `drupal-canvas/react` entry to import',
     };
   }
   const exports = await collectRuntimeExports(

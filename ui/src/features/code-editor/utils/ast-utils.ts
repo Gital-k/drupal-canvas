@@ -6,6 +6,7 @@ const DATA_DEPENDENCY_SOURCES = new Set([
   '@/lib/drupal-utils',
   '@drupal-api-client/json-api-client',
   'drupal-canvas',
+  'drupal-canvas/react',
   'drupal-canvas/drupal-utils',
   'drupal-canvas/jsonapi-client',
 ]);

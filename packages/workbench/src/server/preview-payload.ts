@@ -220,7 +220,7 @@ export function buildPreviewRuntimeEntrySource(options: {
   return [
     "import React from 'react';",
     "import { createRoot } from 'react-dom/client';",
-    "import { CanvasContextProvider, JsonApiClientProvider, createJsonApiClient } from 'drupal-canvas';",
+    "import { createJsonApiClient } from 'drupal-canvas'; import { CanvasContextProvider, JsonApiClientProvider } from 'drupal-canvas/react';",
     "import { renderSpec } from 'drupal-canvas/json-render-utils';",
     "import canvasSiteData from 'virtual:drupal-canvas/site-data';",
     componentImports,
@@ -585,6 +585,9 @@ export async function bundleInteractivePreview(options: {
   );
   const drupalCanvasEntryPath =
     resolveSpecifierFromCurrentModule('drupal-canvas');
+  const drupalCanvasReactPath = resolveSpecifierFromCurrentModule(
+    'drupal-canvas/react',
+  );
   const drupalCanvasJsonRenderUtilsPath = resolveSpecifierFromCurrentModule(
     'drupal-canvas/json-render-utils',
   );
@@ -656,6 +659,10 @@ export async function bundleInteractivePreview(options: {
           {
             find: /^drupal-canvas$/,
             replacement: drupalCanvasEntryPath,
+          },
+          {
+            find: /^drupal-canvas\/react$/,
+            replacement: drupalCanvasReactPath,
           },
           {
             find: 'drupal-canvas/json-render-utils',

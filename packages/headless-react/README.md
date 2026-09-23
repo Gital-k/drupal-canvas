@@ -46,9 +46,9 @@ import HelloCard from './components/canvas/hello-card';
 
 Pass `context={page.context}` so registered components can read the page and
 site context through `usePageContext()` and `useSiteContext()` from
-`drupal-canvas`: the renderer wraps the tree in `CanvasContextProvider`. An
-explicit `context` prop takes precedence over an outer provider, `null` values
-included; when omitted, an outer `CanvasContextProvider` is inherited.
+`drupal-canvas/react`: the renderer wraps the tree in `CanvasContextProvider`.
+An explicit `context` prop takes precedence over an outer provider, `null`
+values included; when omitted, an outer `CanvasContextProvider` is inherited.
 
 `useJsonApiClient()` is served from the nonsecret JSON:API runtime configuration
 the SDK's server integration prepares (`getJsonApiRuntimeConfig()`): either the

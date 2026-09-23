@@ -12,7 +12,8 @@ import { isLegacyRuntimeSupported } from './runtime.js';
  */
 export const AGENT_MIGRATION_PROMPT =
   'Replace `getPageData()`, `getSiteData()`, and `new JsonApiClient()` with ' +
-  '`usePageContext()`, `useSiteContext()`, and `useJsonApiClient()` in function ' +
+  '`usePageContext()`, `useSiteContext()`, and `useJsonApiClient()` from ' +
+  '`drupal-canvas/react` in function ' +
   'components or custom hooks. Call hooks unconditionally at the top level before ' +
   'any possible return; handle missing context or clients. Outside components and ' +
   'custom hooks, use SDK page context data or `getClient()` in headless server ' +
