@@ -1,6 +1,5 @@
 import { resolve } from 'path';
 import { loadEnv } from 'vite';
-import { getTokenEntry } from '@drupal-canvas/auth';
 
 import type { Plugin } from 'vite';
 
@@ -38,20 +37,6 @@ export interface CanvasSiteData {
 export interface CanvasVitePluginApi {
   /** The site data resolved so far; `buildStart` completes it. */
   getCanvasSiteData(): CanvasSiteData;
-}
-
-function readAccessToken(siteUrl: string): string | null {
-  if (process.env.CANVAS_ACCESS_TOKEN) {
-    return process.env.CANVAS_ACCESS_TOKEN;
-  }
-  const entry = getTokenEntry(siteUrl);
-  if (
-    entry?.accessToken &&
-    (!entry.expiresAt || entry.expiresAt > Date.now())
-  ) {
-    return entry.accessToken;
-  }
-  return null;
 }
 
 function prependBaseUrl(url: unknown, base: string): unknown {
@@ -145,20 +130,17 @@ export default function (options: Options = {}): Plugin[] {
 
     // Fetch live site data once from the Canvas HTTP API so that site
     // context and getSiteData() work in Workbench without a full Drupal page
-    // render. The endpoint is public; a token is sent when one is available.
+    // render. This public metadata request must not carry user credentials.
     async buildStart() {
       const siteUrl = options.siteUrl ?? env.CANVAS_SITE_URL;
       if (!siteUrl) {
         return;
       }
-      const token = readAccessToken(siteUrl);
       try {
         const url = `${siteUrl.replace(/\/+$/, '')}/canvas/api/v0/site-data`;
         const response = await fetchImpl(url, {
-          headers: {
-            Accept: 'application/json',
-            ...(token && { Authorization: `Bearer ${token}` }),
-          },
+          credentials: 'omit',
+          headers: { Accept: 'application/json' },
         });
         if (response.ok) {
           // The site-data endpoint also advertises tooling capabilities;
