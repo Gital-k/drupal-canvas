@@ -39,7 +39,7 @@ frontends. Results can be viewed in the Data Fetch pane below the component
 preview.
 
 ```jsx
-import { usePageContext, useSiteContext } from 'drupal-canvas';
+import { usePageContext, useSiteContext } from 'drupal-canvas/react';
 
 export default function PageHeader() {
   const page = usePageContext();
@@ -83,7 +83,7 @@ on pages with a main entity, then this check is not necessary.
 
 **Example usage that fetches a list of articles but excludes the current article being viewed:**
 ```js
-import { useJsonApiClient, usePageContext } from 'drupal-canvas';
+import { useJsonApiClient, usePageContext } from 'drupal-canvas/react';
 import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 import useSWR from 'swr'
 
@@ -166,7 +166,7 @@ editor may see `translationAvailable: true` where an anonymous visitor sees
 
 **Example language switcher:**
 ```js
-import { usePageContext } from 'drupal-canvas';
+import { usePageContext } from 'drupal-canvas/react';
 
 function LanguageSwitcher() {
   const page = usePageContext();
@@ -209,7 +209,7 @@ export default LanguageSwitcher;
 You can also access site information with the `useSiteContext` hook:
 
 ```js
-import { useSiteContext } from 'drupal-canvas';
+import { useSiteContext } from 'drupal-canvas/react';
 
 const site = useSiteContext();
 const siteName = site?.branding.siteName;
@@ -237,7 +237,7 @@ The associated
 is also included as a native package.
 
 ```jsx
-import { useJsonApiClient } from 'drupal-canvas';
+import { useJsonApiClient } from 'drupal-canvas/react';
 import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 import useSWR from 'swr';
 
@@ -308,7 +308,7 @@ and outputs links to each of them using the `getNodePath` utility from the
 back to the `/node/[nid]` path.
 
 ```jsx
-import { getNodePath, useJsonApiClient } from 'drupal-canvas';
+import { getNodePath } from 'drupal-canvas'; import { useJsonApiClient } from 'drupal-canvas/react';
 import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 import useSWR from 'swr';
 
@@ -350,7 +350,7 @@ This example builds a navigation menu using the
 [JSON:API Menu Items module](https://www.drupal.org/project/jsonapi_menu_items):
 
 ```jsx
-import { sortMenu, useJsonApiClient } from 'drupal-canvas';
+import { sortMenu } from 'drupal-canvas'; import { useJsonApiClient } from 'drupal-canvas/react';
 import useSWR from 'swr';
 
 const Navigation = () => {

@@ -4,8 +4,8 @@
 
 `canvas pull` migrates safe `getPageData()` and `getSiteData()` calls in
 pulled components to the `usePageContext()` and `useSiteContext()` hooks from
-`drupal-canvas`, when the connected site advertises context-hook support and
-the project's installed `drupal-canvas` package exports both hooks. The
+`drupal-canvas/react`, when the connected site advertises context-hook support
+and the project's installed React entry exports both hooks as runtime values. The
 migration is all-or-nothing per file: a call must be an imported binding
 called without arguments at an unconditional hook position in a component or
 custom hook, with no possible earlier return and no identifier conflicts.

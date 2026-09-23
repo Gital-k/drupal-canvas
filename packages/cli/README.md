@@ -493,7 +493,9 @@ separate option, but only when both checks pass:
 
 - the connected site advertises context-hook support at
   `/canvas/api/v0/site-data` (`capabilities.contextHooks`), and
-- the project's installed `drupal-canvas` package exports both hooks.
+- the project's installed `drupal-canvas/react` entry statically exports both
+  hooks as runtime values. Root-only packages fail this check; no version
+  threshold or additional capability flag is used.
 
 If either check fails or cannot be verified, getter calls stay unchanged and the
 pull reports the limitation with migration guidance.
@@ -503,7 +505,7 @@ call uses the imported binding, takes no arguments, sits at an unconditional
 hook position in a function component or custom hook with no possible earlier
 return, and the hook names do not conflict with other identifiers. Otherwise the
 file stays unchanged and the reason is reported per file. Aliased imports are
-handled, legacy `@/lib/drupal-utils` imports move to `drupal-canvas`, and unused
+handled, replacement hooks are imported from `drupal-canvas/react`, and unused
 legacy imports are removed. `new JsonApiClient()` and pulled helper modules
 receive diagnostics only. No null guards or type changes are generated; strict
 TypeScript checks may need follow-up for the hooks' nullable results, which the

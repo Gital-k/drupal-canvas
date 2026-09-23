@@ -1,4 +1,4 @@
-import { usePageContext } from 'drupal-canvas';
+import { usePageContext } from 'drupal-canvas/react';
 
 const PageTitle = () => {
   const page = usePageContext();

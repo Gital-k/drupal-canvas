@@ -7,15 +7,15 @@ import {
   useRef,
   useState,
 } from 'react';
-import {
-  CanvasContextProvider,
-  createJsonApiClient,
-  JsonApiClientProvider,
-} from 'drupal-canvas';
+import { createJsonApiClient } from 'drupal-canvas';
 import {
   defineComponentRegistry,
   renderSpec,
 } from 'drupal-canvas/json-render-utils';
+import {
+  CanvasContextProvider,
+  JsonApiClientProvider,
+} from 'drupal-canvas/react';
 import { useNavigate } from 'react-router';
 import siteData from 'virtual:drupal-canvas/site-data';
 import { PreviewErrorAlert } from '@wb/client/components/preview-error-alert';
