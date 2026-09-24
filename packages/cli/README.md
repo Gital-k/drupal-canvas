@@ -511,6 +511,17 @@ receive diagnostics only. No null guards or type changes are generated; strict
 TypeScript checks may need follow-up for the hooks' nullable results, which the
 pull notes.
 
+Direct destructuring of a getter result (including property defaults) leaves the
+entire file unchanged: the replacement hook can return `null`. Convert manually
+with an explicit guard, for example
+`const { pageTitle = 'Unavailable' } = usePageContext() ?? {};`, reviewing
+nested destructuring separately. Existing `getPageData() ?? {}` and
+`getSiteData() ?? {}` fallbacks can migrate when the call is otherwise
+unconditional; right-hand short-circuit operands, ternary branches and
+destructuring defaults cannot. Direct assignment followed by optional access
+continues to migrate. This is not a general null-safety or data-flow analysis of
+subsequent uses.
+
 Planned conversions are listed before the confirmation prompt (and applied with
 `--yes`). Afterwards the pull lists migrated files with their replacements,
 per-file warnings for the remaining cases, and one consolidated AI-agent
