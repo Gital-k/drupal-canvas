@@ -46,11 +46,8 @@ export const createComponentFormStateHandler = (
   return (
     newFormState: PropsValues,
     newInputAndUiData: InputUIData,
-    currFormStateRef: React.MutableRefObject<PropsValues>,
+    currFormState: PropsValues,
   ) => {
-    // Read the ref so debounced calls use form state as of fire time, not
-    // schedule time.
-    const currFormState = currFormStateRef.current;
     // Apply (client-side) transforms for form state.
     const { propsValues: values, selectedModel } = getPropsValues(
       { ...currFormState, ...newFormState },

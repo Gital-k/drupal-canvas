@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { Controller } from 'react-hook-form';
 
 import { useAppSelector } from '@/app/hooks';
@@ -70,11 +70,6 @@ export const ComponentFormField = <P extends Record<string, any>>({
     selectFormValues(state, FORM_TYPES.COMPONENT_INSTANCE_FORM),
   );
 
-  // Latest formState, read by debounced saves at fire time instead of the
-  // stale value closed over when the save was scheduled.
-  const formStateRef = useRef(formState);
-  formStateRef.current = formState;
-
   // Memo attributes to prevent re-renders when only the object
   // reference changes but the values are identical.
   const MemoizedWrappedComponent = useMemo(
@@ -98,25 +93,14 @@ export const ComponentFormField = <P extends Record<string, any>>({
         !isScalarProp ||
         components?.[selectedComponentType]?.source !== 'Code component' ||
         !['checkbox', 'radio'].includes(elementType as string);
-      // Reduce to only the field(s) that actually changed, to avoid
-      // clobbering sibling fields that changed since this snapshot was taken.
-      const changedFormState = Object.fromEntries(
-        Object.entries(newFormState).filter(
-          ([key, value]) => formStateRef.current[key] !== value,
-        ),
-      );
       if (shouldDebounce) {
         debounceFormStateToLayoutModelStore(
-          changedFormState,
+          newFormState,
           inputAndUiData,
-          formStateRef,
+          formState,
         );
       } else {
-        formStateToLayoutModelStore(
-          changedFormState,
-          inputAndUiData,
-          formStateRef,
-        );
+        formStateToLayoutModelStore(newFormState, inputAndUiData, formState);
       }
     };
   })();
