@@ -126,10 +126,9 @@ The last route is the same-origin JSON:API proxy portable Code Components reach
 Drupal through (see `@drupal-canvas/headless`); mount it at the path configured
 by `CANVAS_JSONAPI_PROXY_PATH` (default `/api/canvas/jsonapi`).
 
-**4. Root layout** — the `CanvasRuntime` server component supplies the
-request's nonsecret JSON:API runtime configuration to every
-`CanvasComponentTree` below it, so `useJsonApiClient()` works in registered
-components:
+**4. Root layout** — the `CanvasRuntime` server component supplies the request's
+nonsecret JSON:API runtime configuration to every `CanvasComponentTree` below
+it, so `useJsonApiClient()` works in registered components:
 
 ```tsx
 // app/layout.tsx
