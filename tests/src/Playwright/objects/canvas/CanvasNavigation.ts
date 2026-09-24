@@ -88,7 +88,6 @@ export function CanvasNavigationMixin<TBase extends Constructor<CanvasBase>>(
       const libraryHeading = this.page.getByRole('heading', {
         name: 'Library',
       });
-
       if (!(await libraryHeading.isVisible())) {
         await this.page
           .getByTestId('canvas-side-menu')
