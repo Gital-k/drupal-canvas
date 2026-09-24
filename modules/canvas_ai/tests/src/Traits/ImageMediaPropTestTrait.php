@@ -15,10 +15,6 @@ use Drupal\user\Entity\User;
 
 /**
  * Sets up image props that are populated by a media item.
- *
- * An agent supplies such a prop as the media item's ID, and Canvas resolves
- * that reference with the current user's access rights — which is what lets
- * these tools be tested against a media item the user may not view.
  */
 trait ImageMediaPropTestTrait {
 
