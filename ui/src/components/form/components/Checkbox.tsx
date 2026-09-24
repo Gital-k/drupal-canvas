@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 
 import { useFieldContext } from '@/components/form/contexts/FieldContext';
@@ -35,8 +35,35 @@ const castBoolean = (value: unknown): boolean => {
 };
 
 const Checkbox = ({ attributes = {} }: { attributes?: Attributes }) => {
-  const [checked, setChecked] = useState(castBoolean(attributes?.checked));
+  const incomingChecked = castBoolean(attributes?.checked);
+  const [checked, setChecked] = useState(incomingChecked);
   const fieldContext = useFieldContext();
+
+  // Adjust the checked state when this checkbox is re-rendered with a
+  // different "checked" attribute than the one it was last rendered with.
+  // The page data form is re-fetched after publishing, and without this
+  // the state from the previous render would win, leaving the checkbox
+  // showing a value that is no longer the stored one.
+  const [renderedChecked, setRenderedChecked] = useState(incomingChecked);
+  if (incomingChecked !== renderedChecked) {
+    setRenderedChecked(incomingChecked);
+    setChecked(incomingChecked);
+  }
+
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // The input's checked state is uncontrolled (see `defaultChecked` below),
+  // so React only applies it once, at mount. When `checked` changes on a
+  // later render (e.g. the resync above), push it onto the DOM node
+  // directly so the native "checked" property doesn't silently fall out of
+  // sync with what's visually shown, which would otherwise make the next
+  // click toggle in the wrong direction.
+  useEffect(() => {
+    const node = inputRef.current;
+    if (node && node.checked !== checked) {
+      node.checked = checked;
+    }
+  }, [checked]);
 
   const handleChange = (e: CheckboxEvent, shimJquery = true) => {
     const newChecked = castBoolean(e.target.checked);
@@ -59,6 +86,7 @@ const Checkbox = ({ attributes = {} }: { attributes?: Attributes }) => {
       className={clsx(attributes.class, styles.base, checked && styles.checked)}
       onChange={handleChange}
       ref={(node) => {
+        inputRef.current = node;
         if (!node) {
           return;
         }
