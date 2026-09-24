@@ -658,9 +658,13 @@ describe('fetchPage', () => {
     await expect(server.fetchPage('/example')).resolves.toEqual(emptyPage);
   });
 
-  it('reports missing context from older sites as null page and site context', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { context, ...legacyPage } = page;
+  it('normalizes a Canvas 1.11 response without context to null page and site slots', async () => {
+    // The release response contains content/head/route, but no context.
+    const legacyPage = {
+      content: page.content,
+      head: page.head,
+      route: page.route,
+    };
     const fetchImpl = vi.fn().mockResolvedValue(Response.json(legacyPage));
     const { server } = makeServer(fetchImpl as unknown as typeof fetch);
 
