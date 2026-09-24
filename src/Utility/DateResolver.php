@@ -149,6 +149,7 @@ final class DateResolver {
     if ($iso === '') {
       return $iso;
     }
+    // @todo Format date+time values in the current user's timezone, the one they are entered and shown in on the component form; keep date-only values in UTC.
     try {
       // Parse in UTC so that ISO strings with a Z suffix (e.g. date-time props
       // stored by Canvas) and bare date strings both render at the same UTC

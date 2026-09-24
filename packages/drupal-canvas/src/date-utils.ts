@@ -66,6 +66,8 @@ const getDrupalLangcode = (): string =>
  * stored without timezone offset. Formatting in the local browser timezone
  * would silently shift dates — e.g. a UTC midnight date would appear as the
  * previous day in negative-UTC-offset timezones (Americas).
+ *
+ * @todo Format date+time values in the current user's timezone, the one they are entered and shown in on the component form; keep date-only values in UTC.
  */
 const createFormatter = (
   locale: string,
