@@ -59,6 +59,7 @@ paths:
                   - $ref: '#/components/schemas/CanvasRedirectResult'
               examples:
                 content:
+                  summary: French request rendering English because the French translation is unavailable.
                   value:
                     content:
                       element: js-example-card
@@ -68,12 +69,33 @@ paths:
                       title: Example page
                     route:
                       name: entity.canvas_page.canonical
-                      requestUri: /page/1
+                      requestUri: /fr/page/1
                       params:
                         canvas_page: '1'
                       managedByCanvas: true
-                      negotiatedLanguage: en
-                      translations: []
+                      negotiatedLanguage: fr
+                      translations:
+                        - langcode: en
+                          name: English
+                          nativeName: English
+                          url: /contact
+                          translationAvailable: true
+                          current: false
+                          external: false
+                        - langcode: fr
+                          name: French
+                          nativeName: Français
+                          url: /fr/page/1
+                          translationAvailable: false
+                          current: true
+                          external: false
+                        - langcode: es
+                          name: Spanish
+                          nativeName: Español
+                          url: /es/contact
+                          translationAvailable: true
+                          current: false
+                          external: false
                       entity:
                         entityType: canvas_page
                         bundle: canvas_page

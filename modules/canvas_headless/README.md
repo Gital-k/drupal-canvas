@@ -109,6 +109,8 @@ Canvas does not manage the requested entity and view mode.
 
 ### Content response
 
+This example requests French, but renders English because the French translation is unavailable.
+
 ```text
 {
   "content": {...},
@@ -137,13 +139,17 @@ Canvas does not manage the requested entity and view mode.
   },
   "route": {
     "name": "entity.canvas_page.canonical",
-    "requestUri": "/page/1",
+    "requestUri": "/fr/page/1",
     "params": {
       "canvas_page": "1"
     },
     "managedByCanvas": true,
-    "negotiatedLanguage": "en",
-    "translations": [],
+    "negotiatedLanguage": "fr",
+    "translations": [
+      { "langcode": "en", "name": "English", "nativeName": "English", "url": "/contact", "translationAvailable": true, "current": false, "external": false },
+      { "langcode": "fr", "name": "French", "nativeName": "Français", "url": "/fr/page/1", "translationAvailable": false, "current": true, "external": false },
+      { "langcode": "es", "name": "Spanish", "nativeName": "Español", "url": "/es/contact", "translationAvailable": true, "current": false, "external": false }
+    ],
     "entity": {
       "entityType": "canvas_page",
       "bundle": "canvas_page",

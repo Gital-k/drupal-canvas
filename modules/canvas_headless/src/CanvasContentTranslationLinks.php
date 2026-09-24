@@ -28,6 +28,17 @@ use Symfony\Component\HttpFoundation\Request;
  * The optional language_negotiator service is NULL without the language module.
  * All language plugin references are guarded by the negotiator's presence.
  *
+ * @phpstan-import-type TranslationMetadata from \Drupal\canvas\EntityTranslationMetadata
+ * @phpstan-type HeadlessTranslationMetadata array{
+ *   langcode: TranslationMetadata['langcode'],
+ *   name: TranslationMetadata['name'],
+ *   nativeName: TranslationMetadata['nativeName'],
+ *   url: TranslationMetadata['url'],
+ *   translationAvailable: TranslationMetadata['translationAvailable'],
+ *   current: TranslationMetadata['current'],
+ *   external: bool,
+ * }
+ *
  * @drupalOptionalDependency language
  */
 final class CanvasContentTranslationLinks {
@@ -43,7 +54,7 @@ final class CanvasContentTranslationLinks {
   /**
    * Returns language context and adds all translation dependencies.
    *
-   * @return array{negotiatedLanguage: string, translations: list<array{langcode: string, name: string, nativeName: string, url: string, translationAvailable: bool, current: bool, external: bool}>}
+   * @return array{negotiatedLanguage: string, translations: list<HeadlessTranslationMetadata>}
    *   Language context for the route.
    */
   public function build(?ContentEntityInterface $entity, Request $request, CacheableMetadata $cacheability): array {

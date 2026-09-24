@@ -14,6 +14,8 @@ use Drupal\Core\TypedData\TranslatableInterface;
 /**
  * Shared language-switcher metadata for Code Components and headless routes.
  *
+ * @phpstan-type TranslationMetadata array{langcode: string, name: string, nativeName: string, url: string, translationAvailable: bool, current: bool}
+ *
  * @internal
  */
 final class EntityTranslationMetadata {
@@ -26,7 +28,7 @@ final class EntityTranslationMetadata {
    *   unavailable, using the entry's language. This preserves Code Component
    *   fallback behavior; an unavailable entry's URL is not an access guarantee.
    *
-   * @return list<array{langcode: string, name: string, nativeName: string, url: string, translationAvailable: bool, current: bool}>
+   * @return list<TranslationMetadata>
    *   The shared translation entries, empty on monolingual sites.
    */
   public static function build(
