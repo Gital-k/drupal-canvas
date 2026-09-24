@@ -561,6 +561,36 @@ describe('createJsonApiClient', () => {
     },
   );
 
+  it.each([undefined, '/custom/proxy'])(
+    'omits empty bundle segments for unbundled reads (proxy: %s)',
+    async (proxyUrl) => {
+      const transport = fakeFetch(() => jsonResponse({ data: [] }));
+      const client = createJsonApiClient({
+        baseUrl: 'https://drupal.example/sub',
+        apiPrefix: 'api/v1',
+        proxyUrl,
+        serializer: null,
+        fetch: transport.fetch,
+      });
+      const uuid = 'adbb9be6-9977-4418-b687-d88d8572c7e2';
+      const options = { locale: 'deutsch', queryString: 'include=parent' };
+
+      // The menu endpoint uses a menu ID, not a bundle segment.
+      await client.getResource('menu_items', 'main');
+      await client.getResource('menu_items', uuid, options);
+      await client.getCollection('menu_items', options);
+      await client.getResource('node--page', uuid, options);
+
+      const base = proxyUrl ?? 'https://drupal.example/sub';
+      expect(transport.calls.map((call) => call.url)).toEqual([
+        `${base}/api/v1/menu_items/main`,
+        `${base}/deutsch/api/v1/menu_items/${uuid}?include=parent`,
+        `${base}/deutsch/api/v1/menu_items?include=parent`,
+        `${base}/deutsch/api/v1/node/page/${uuid}?include=parent`,
+      ]);
+    },
+  );
+
   it('keeps the site path and puts the locale between it and the prefix, for every method and the router', async () => {
     const { fetch, calls } = fakeFetch((url) =>
       url.includes('translate-path')
