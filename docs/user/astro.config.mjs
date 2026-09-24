@@ -159,6 +159,14 @@ export default defineConfig({
             { label: 'Customizing forms', slug: 'apis/customizing-forms' },
             { label: 'Theme settings', slug: 'apis/theme-settings' },
           ],
+        },
+        {
+          label: 'Headless',
+          items: [
+            { label: 'Introduction', slug: 'headless' },
+            { label: 'Setup', slug: 'headless/setup' },
+            { label: 'FAQ', slug: 'headless/faq' },
+          ],
         }
       ],
     }),
