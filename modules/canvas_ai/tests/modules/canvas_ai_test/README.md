@@ -5,6 +5,10 @@ tests can drive the AI chat without an AI provider. The response is picked from
 the last user message, slugified: "What is a CMS?" is answered from
 `fixtures/what_is_a_cms.json`.
 
+The dev chat's stop route, `/admin/api/canvas/ai-dev/stop`, is passed through
+rather than answered: it calls no model, and the controller has to run to drop
+what a stopped turn parked.
+
 ## Fixtures for a turn that hops
 
 The dev chat (`canvas_dev_ai`) runs one turn as several requests: the agent

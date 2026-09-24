@@ -47,7 +47,11 @@ class CanvasAiRequestInterceptor implements EventSubscriberInterface {
     }
     $request = $event->getRequest();
     $path = $request->getPathInfo();
-    if (str_starts_with($path, '/admin/api/canvas/ai')) {
+    // The dev chat's stop route calls no model: it drops what a stopped turn
+    // parked, and only its controller can do that. Every other route under
+    // the prefix is answered from a fixture.
+    // @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
+    if (str_starts_with($path, '/admin/api/canvas/ai') && $path !== '/admin/api/canvas/ai-dev/stop') {
       $response = $this->getFixtureResponse($request);
       $event->setResponse($response);
     }
