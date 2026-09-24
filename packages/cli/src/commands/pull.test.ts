@@ -839,7 +839,7 @@ describe('Pull Command', () => {
     const safeSource = `import { getPageData } from 'drupal-canvas';
 
 export default function Title() {
-  const { pageTitle } = getPageData();
+  const { pageTitle } = getPageData() ?? {};
   return <h1>{pageTitle}</h1>;
 }
 `;
@@ -853,6 +853,59 @@ export default function Crumbs({ show }) {
   return <nav>{breadcrumbs.length}</nav>;
 }
 `;
+
+    it('reports nullable destructuring through pull without partially rewriting the file', async () => {
+      const source = `import { getPageData as read, getSiteData, JsonApiClient } from 'drupal-canvas';
+export default function Example() {
+  const site = getSiteData();
+  const { pageTitle: title = 'Unavailable' } = read();
+  const client = new JsonApiClient();
+  return title || site?.branding.siteName;
+}`;
+      const api = {
+        listComponents: vi.fn().mockResolvedValue({
+          a: getterComponent('nullable', source),
+          b: getterComponent('guarded', safeSource),
+        }),
+      } as unknown as ApiService;
+      const task = createComponentsPullTask(
+        api,
+        tmpDir,
+        false,
+        { colors: [] },
+        { folders: [] },
+        { supported: true, reasons: [] },
+      );
+      const { summaryLines } = await task.prepare();
+      expect(summaryLines).toContain(
+        'Components: 1 getter migration to context hooks',
+      );
+      const outcome = await task.execute();
+      expect(
+        await fs.readFile(path.join(tmpDir, 'nullable', 'index.tsx'), 'utf-8'),
+      ).toBe(source);
+      expect(
+        await fs.readFile(path.join(tmpDir, 'guarded', 'index.tsx'), 'utf-8'),
+      ).toContain('usePageContext() ?? {}');
+      const message = vi.mocked(p.log.message).mockClear();
+      reportResults(outcome.results, outcome.title, outcome.label, {
+        ...COMMAND_RESULT_REPORT_OPTIONS,
+        showTitle: false,
+      });
+      const report = message.mock.calls.map(([text]) => text).join('\n');
+      expect(report).toContain('Warnings');
+      expect(report).toContain('nullable');
+      expect(report).toContain(
+        'Not migrated: `read()` is destructured without a null guard',
+      );
+      expect(report).toContain('`usePageContext() ?? {}`');
+      expect(
+        report.match(/`new JsonApiClient\(\)` is not migrated automatically/g),
+      ).toHaveLength(1);
+      expect(outcome.notes).toContainEqual(
+        expect.stringContaining('not migrated automatically): nullable'),
+      );
+    });
 
     it('plans and applies conversions when both gates pass', async () => {
       const api = {
@@ -889,7 +942,9 @@ export default function Crumbs({ show }) {
       expect(written).toContain(
         "import { usePageContext } from 'drupal-canvas/react';",
       );
-      expect(written).toContain('const { pageTitle } = usePageContext();');
+      expect(written).toContain(
+        'const { pageTitle } = usePageContext() ?? {};',
+      );
       expect(
         await fs.readFile(path.join(tmpDir, 'crumbs', 'index.tsx'), 'utf-8'),
       ).toBe(unsafeSource);
