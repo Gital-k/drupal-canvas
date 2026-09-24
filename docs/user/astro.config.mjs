@@ -130,8 +130,8 @@ export default defineConfig({
           items: [
             { label: 'Introduction', slug: 'headless' },
             { label: 'Setup', slug: 'headless/setup' },
-            { label: 'FAQ', slug: 'headless/faq' },
             { label: 'Multilingual sites', slug: 'headless/multilingual-sites' },
+            { label: 'FAQ', slug: 'headless/faq' },
           ],
         },
         {
