@@ -8,6 +8,7 @@ namespace Drupal\canvas_headless\EventSubscriber;
 
 use Drupal\canvas_headless\CanvasContentProblemResponse;
 use Drupal\canvas_headless\Controller\CanvasEntityController;
+use Drupal\canvas_headless\PreviewLanguageRedirectResponse;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Cache\CacheableJsonResponse;
@@ -125,6 +126,12 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
   public static function convertRedirect(ResponseEvent $event): void {
     $request = $event->getRequest();
     $original_response = $event->getResponse();
+    if ($original_response instanceof PreviewLanguageRedirectResponse) {
+      // Core's finish-response subscriber replaces cache headers. Reassert
+      // private/no-store after it, and leave this transport Location intact.
+      $original_response->headers->set('Cache-Control', 'private, no-store');
+      return;
+    }
     if (
       \is_string($request->attributes->get(CanvasContentApiRequest::REQUESTED_URI_ATTRIBUTE)) &&
       $original_response instanceof RedirectResponse
@@ -154,6 +161,16 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
   }
 
   /**
+   * Adds Authorization variation after core finishes and redirect conversion.
+   */
+  public static function addAuthorizationVary(ResponseEvent $event): void {
+    if ($event->isMainRequest() && self::isContentApiRequest($event->getRequest())) {
+      // Do not let shared caches serve a published response to a draft preview.
+      $event->getResponse()->setVary('Authorization', replace: FALSE);
+    }
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents(): array {
@@ -162,6 +179,7 @@ final class CanvasContentResponseSubscriber implements EventSubscriberInterface 
         ['convertError', 9],
         ['addCacheability', 8],
         ['convertRedirect', -11],
+        ['addAuthorizationVary', -12],
       ],
     ];
   }
