@@ -4,11 +4,11 @@ import { parse } from '@babel/parser';
 import { diagnoseLegacyApiUsage, migrateGetterCalls } from './getter-codemod';
 
 describe('migrateGetterCalls', () => {
-  it('converts a plain call in a component and rewrites the import', () => {
+  it('converts a guarded call in a component and rewrites the import', () => {
     const source = `import { getPageData } from 'drupal-canvas';
 
 export default function PageTitle() {
-  const { pageTitle } = getPageData();
+  const { pageTitle } = getPageData() ?? {};
   if (!pageTitle) {
     return null;
   }
@@ -21,7 +21,7 @@ export default function PageTitle() {
       .toBe(`import { usePageContext } from 'drupal-canvas/react';
 
 export default function PageTitle() {
-  const { pageTitle } = usePageContext();
+  const { pageTitle } = usePageContext() ?? {};
   if (!pageTitle) {
     return null;
   }
@@ -455,7 +455,7 @@ export default function C() {
       `import { getPageData } from 'drupal-canvas';
 const usePageContext = () => ({ pageTitle: 'local' });
 export default function C() {
-  const { pageTitle } = getPageData();
+  const { pageTitle } = getPageData() ?? {};
   return <h1>{pageTitle}</h1>;
 }`,
       'already declared',
