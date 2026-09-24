@@ -1,4 +1,4 @@
-// @cspell:ignore Aworking
+// @cspell:ignore Aworking fother
 import {
   JSONAPI_DRAFT_SESSION_EXPIRED_ERROR,
   JSONAPI_PROXY_SESSION_HEADER,
