@@ -349,7 +349,8 @@ const dateTime: Transformer<
     if ('time' in record && record.time) {
       timeString = record.time;
     }
-    if (!dateString && !timeString) {
+    // A time without a date is not a value, e.g. an empty multi-value row.
+    if (!dateString) {
       return null;
     }
 

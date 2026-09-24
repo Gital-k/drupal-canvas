@@ -661,6 +661,27 @@ describe('Transforms - dateTime', () => {
       ),
     ).toEqual('2026-01-01 00:30:00');
   });
+
+  it('should strip date+time rows without a date', () => {
+    const dateTimePropSource = {
+      sourceType: 'static:field_item:datetime',
+      sourceTypeSettings: {
+        storage: { datetime_type: 'datetime' },
+      },
+    };
+    expect(
+      transforms.dateTime(
+        [
+          { date: '', time: '' },
+          { date: '2025-12-31', time: '23:30:00' },
+          { date: '', time: '00:30:00' },
+          { date: '2026-01-01', time: '' },
+        ],
+        { type: 'datetime', multiple: true },
+        dateTimePropSource,
+      ),
+    ).toEqual(['2025-12-31 23:30:00', '2026-01-01 12:00:00']);
+  });
 });
 
 describe('Transforms - dateRange', () => {
