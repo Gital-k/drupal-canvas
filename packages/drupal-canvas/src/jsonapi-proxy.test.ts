@@ -1,4 +1,4 @@
-// @cspell:ignore Fuser
+// @cspell:ignore Fuser fother cother Fquery
 import { describe, expect, it } from 'vitest';
 
 import {
