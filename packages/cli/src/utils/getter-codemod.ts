@@ -377,9 +377,8 @@ function containsExit(node: Node): boolean {
 
 /**
  * Checks that a call sits at an unconditional hook position: inside a
- * component or custom hook, not nested in another function, not inside a
- * conditional, loop, try, or short-circuit expression, and with no possible
- * return before its statement.
+ * component or custom hook, not nested in another function or a conditional
+ * branch, loop or try, and with no possible return before its statement.
  */
 function hookPositionProblem(
   call: CallExpression,
@@ -402,7 +401,23 @@ function hookPositionProblem(
     return 'called inside a function that is not a component or custom hook';
   }
   const between = parents.slice(fnIndex + 1);
-  const conditional = between.find((node) => CONDITIONAL_TYPES.has(node.type));
+  const conditional = between.find((node, index) => {
+    const child = between[index + 1] ?? call;
+    // The left operand of ?? always runs. Keep checking outer ancestors:
+    // condition && (getter() ?? {}) is still a conditional hook call.
+    if (
+      node.type === 'LogicalExpression' &&
+      node.operator === '??' &&
+      node.left === child
+    ) {
+      return false;
+    }
+    // Destructuring defaults run only when the supplied value is undefined.
+    return (
+      CONDITIONAL_TYPES.has(node.type) ||
+      (node.type === 'AssignmentPattern' && node.right === child)
+    );
+  });
   if (conditional) {
     return `called conditionally (inside ${conditional.type})`;
   }
@@ -428,6 +443,42 @@ function hookPositionProblem(
     }
     // A return inside the same statement before the call, e.g. inside an
     // arrow body, is already a nested function or conditional.
+  }
+  return null;
+}
+
+/** Reject direct destructuring of the nullable replacement hook result. */
+function nullableDestructuringProblem(
+  call: CallExpression,
+  parents: Node[],
+  getter: GetterName,
+): string | null {
+  let value: Node = call;
+  for (let index = parents.length - 1; index >= 0; index -= 1) {
+    const parent = parents[index];
+    // Type assertions/non-null assertions do not guard null at runtime.
+    if (
+      parent.type === 'TSAsExpression' ||
+      parent.type === 'TSTypeAssertion' ||
+      parent.type === 'TSNonNullExpression' ||
+      parent.type === 'TSSatisfiesExpression' ||
+      parent.type === 'ParenthesizedExpression'
+    ) {
+      value = parent;
+      continue;
+    }
+    const pattern =
+      parent.type === 'VariableDeclarator' && parent.init === value
+        ? parent.id
+        : parent.type === 'AssignmentExpression' && parent.right === value
+          ? parent.left
+          : null;
+    if (pattern?.type === 'ObjectPattern' || pattern?.type === 'ArrayPattern') {
+      return `destructured without a null guard; ${GETTER_HOOKS[getter]}() can return null. Convert manually using \`${GETTER_HOOKS[getter]}() ?? {}\` and review the destructuring pattern and nested defaults`;
+    }
+    // An explicit fallback is left as authored; do not invent one or infer
+    // data flow through other expressions or subsequent variable uses.
+    return null;
   }
   return null;
 }
@@ -672,11 +723,10 @@ export function migrateGetterCalls(
         noteUnsafe(`\`${node.name}.${getter}()\` is called with arguments`);
         return;
       }
-      const problem = hookPositionProblem(
-        grandparent,
-        parents.slice(0, -2),
-        wrappers,
-      );
+      const callParents = parents.slice(0, -2);
+      const problem =
+        hookPositionProblem(grandparent, callParents, wrappers) ??
+        nullableDestructuringProblem(grandparent, callParents, getter);
       if (problem) {
         noteUnsafe(`\`${node.name}.${getter}()\` is ${problem}`);
         return;
@@ -718,7 +768,10 @@ export function migrateGetterCalls(
       noteUnsafe(`\`${binding.local}()\` is called with arguments`);
       return;
     }
-    const problem = hookPositionProblem(parent, parents.slice(0, -1), wrappers);
+    const callParents = parents.slice(0, -1);
+    const problem =
+      hookPositionProblem(parent, callParents, wrappers) ??
+      nullableDestructuringProblem(parent, callParents, binding.getter);
     if (problem) {
       noteUnsafe(`\`${binding.local}()\` is ${problem}`);
       return;
