@@ -1,4 +1,6 @@
-# Multilingual sites with Canvas Headless
+---
+title: Headless - Multilingual sites
+---
 
 <!-- cspell:words contacto contactanos productos -->
 
