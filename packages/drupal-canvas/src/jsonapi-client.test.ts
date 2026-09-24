@@ -1,5 +1,5 @@
 // @cspell:ignore Aworking Alatest
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 import {
   createJsonApiClient,
@@ -13,6 +13,10 @@ import {
 import { declareCanvasRuntime } from './runtime';
 
 import type { Cache } from '@drupal-api-client/api-client';
+import type {
+  GetOptions,
+  RawApiResponseWithData,
+} from '@drupal-api-client/json-api-client';
 
 type FetchCall = { url: string; init?: RequestInit };
 
@@ -180,6 +184,62 @@ describe('createJsonApiClient', () => {
       items: ['Draft A', 'Published B'],
     });
   });
+
+  it.each([null, 'rel:working-copy'])(
+    'discriminates collection return types with resourceVersion %s',
+    async (resourceVersion) => {
+      type Items = Array<{ id: string; title: string }>;
+      const { fetch } = fakeFetch((url) => {
+        const item = articleCollection().data.find((item) =>
+          url.includes(`/article/${item.id}?`),
+        );
+        return jsonResponse(item ? { data: item } : articleCollection());
+      });
+      const client = createJsonApiClient({
+        baseUrl: 'https://drupal.example',
+        resourceVersion,
+        fetch,
+      });
+      const omitted = await client.getCollection<Items>('node--article');
+      const explicitUndefined = await client.getCollection<Items>(
+        'node--article',
+        undefined,
+      );
+      const parsed = await client.getCollection<Items>('node--article', {
+        rawResponse: false,
+      });
+      const raw = await client.getCollection<Items>('node--article', {
+        rawResponse: true,
+      });
+      expectTypeOf(omitted).toEqualTypeOf<Items>();
+      expectTypeOf(explicitUndefined).toEqualTypeOf<Items>();
+      expectTypeOf(parsed).toEqualTypeOf<Items>();
+      expectTypeOf(raw).toEqualTypeOf<RawApiResponseWithData<Items>>();
+      expect(parsed).toEqual(omitted);
+      expect(explicitUndefined).toEqual(omitted);
+      expect(parsed.map((item) => item.title)).toEqual([
+        'Published A',
+        'Published B',
+      ]);
+      expect(raw.response).toBeInstanceOf(Response);
+      expect(raw.json).toEqual(parsed);
+
+      const withOptions = (options?: GetOptions) =>
+        client.getCollection<Items>('node--article', options);
+      expectTypeOf(withOptions).returns.toEqualTypeOf<
+        Promise<Items | RawApiResponseWithData<Items>>
+      >();
+      for (const rawResponse of [false, true]) {
+        const dynamic = await client.getCollection<Items>('node--article', {
+          rawResponse,
+        });
+        expectTypeOf(dynamic).toEqualTypeOf<
+          Items | RawApiResponseWithData<Items>
+        >();
+        expect(Array.isArray(dynamic)).toBe(!rawResponse);
+      }
+    },
+  );
 
   it('returns raw collection responses without hydration', async () => {
     const { fetch, calls } = fakeFetch(() => jsonResponse(articleCollection()));
