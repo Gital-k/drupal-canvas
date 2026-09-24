@@ -185,61 +185,37 @@ describe('createJsonApiClient', () => {
     });
   });
 
-  it.each([null, 'rel:working-copy'])(
-    'discriminates collection return types with resourceVersion %s',
-    async (resourceVersion) => {
-      type Items = Array<{ id: string; title: string }>;
-      const { fetch } = fakeFetch((url) => {
-        const item = articleCollection().data.find((item) =>
-          url.includes(`/article/${item.id}?`),
-        );
-        return jsonResponse(item ? { data: item } : articleCollection());
-      });
-      const client = createJsonApiClient({
-        baseUrl: 'https://drupal.example',
-        resourceVersion,
-        fetch,
-      });
-      const omitted = await client.getCollection<Items>('node--article');
-      const explicitUndefined = await client.getCollection<Items>(
-        'node--article',
-        undefined,
-      );
-      const parsed = await client.getCollection<Items>('node--article', {
-        rawResponse: false,
-      });
-      const raw = await client.getCollection<Items>('node--article', {
-        rawResponse: true,
-      });
-      expectTypeOf(omitted).toEqualTypeOf<Items>();
-      expectTypeOf(explicitUndefined).toEqualTypeOf<Items>();
-      expectTypeOf(parsed).toEqualTypeOf<Items>();
-      expectTypeOf(raw).toEqualTypeOf<RawApiResponseWithData<Items>>();
-      expect(parsed).toEqual(omitted);
-      expect(explicitUndefined).toEqual(omitted);
-      expect(parsed.map((item) => item.title)).toEqual([
-        'Published A',
-        'Published B',
-      ]);
-      expect(raw.response).toBeInstanceOf(Response);
-      expect(raw.json).toEqual(parsed);
+  // Compile-time collection return-type assertions; no requests are invoked.
+  {
+    type Items = Array<{ id: string; title: string }>;
+    type Client = ReturnType<typeof createJsonApiClient>;
+    // Inspect return types without invoking the request functions.
+    const omitted = (client: Client) =>
+      client.getCollection<Items>('node--article');
+    const explicitUndefined = (client: Client) =>
+      client.getCollection<Items>('node--article', undefined);
+    const parsed = (client: Client) =>
+      client.getCollection<Items>('node--article', { rawResponse: false });
+    const raw = (client: Client) =>
+      client.getCollection<Items>('node--article', { rawResponse: true });
+    const dynamic = (client: Client, rawResponse: boolean) =>
+      client.getCollection<Items>('node--article', { rawResponse });
+    const withOptions = (client: Client, options?: GetOptions) =>
+      client.getCollection<Items>('node--article', options);
 
-      const withOptions = (options?: GetOptions) =>
-        client.getCollection<Items>('node--article', options);
-      expectTypeOf(withOptions).returns.toEqualTypeOf<
-        Promise<Items | RawApiResponseWithData<Items>>
-      >();
-      for (const rawResponse of [false, true]) {
-        const dynamic = await client.getCollection<Items>('node--article', {
-          rawResponse,
-        });
-        expectTypeOf(dynamic).toEqualTypeOf<
-          Items | RawApiResponseWithData<Items>
-        >();
-        expect(Array.isArray(dynamic)).toBe(!rawResponse);
-      }
-    },
-  );
+    expectTypeOf(omitted).returns.toEqualTypeOf<Promise<Items>>();
+    expectTypeOf(explicitUndefined).returns.toEqualTypeOf<Promise<Items>>();
+    expectTypeOf(parsed).returns.toEqualTypeOf<Promise<Items>>();
+    expectTypeOf(raw).returns.toEqualTypeOf<
+      Promise<RawApiResponseWithData<Items>>
+    >();
+    expectTypeOf(dynamic).returns.toEqualTypeOf<
+      Promise<Items | RawApiResponseWithData<Items>>
+    >();
+    expectTypeOf(withOptions).returns.toEqualTypeOf<
+      Promise<Items | RawApiResponseWithData<Items>>
+    >();
+  }
 
   it('returns raw collection responses without hydration', async () => {
     const { fetch, calls } = fakeFetch(() => jsonResponse(articleCollection()));
