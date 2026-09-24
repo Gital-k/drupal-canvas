@@ -275,10 +275,10 @@ export type PullCodemodSupport = ContextHookSupport | null;
 
 /** The AI-agent migration prompt printed for components left unchanged. */
 export const GETTER_MIGRATION_PROMPT =
-  'Replace `getPageData()`, `getSiteData()`, and `new JsonApiClient()` with ' +
-  '`usePageContext()`, `useSiteContext()`, and `useJsonApiClient()` from ' +
-  '`drupal-canvas/react` in function ' +
-  'components or custom hooks. Call hooks unconditionally at the top level before ' +
+  'Legacy APIs remain supported in Drupal and Workbench. For headless use, ' +
+  'migrate only the remaining legacy API usages identified above. In function ' +
+  'components or custom hooks, use the corresponding hooks from ' +
+  '`drupal-canvas/react`. Call hooks unconditionally at the top level before ' +
   'any possible return; handle missing context or clients. Outside components and ' +
   'custom hooks, use SDK page context data or `getClient()` in headless server ' +
   'code; pass data or a client to browser helpers. Preserve output, types, hook ' +
@@ -467,7 +467,8 @@ export function createComponentsPullTask(
     }): Promise<PullTaskResult> {
       const results: Result[] = [];
       const notes: string[] = [];
-      const notMigrated: string[] = [];
+      const unmigratedGetters: string[] = [];
+      const legacyClients: string[] = [];
       let migratedAny = false;
 
       for (const remoteComponent of Object.values(components)) {
@@ -503,12 +504,11 @@ export function createComponentsPullTask(
           const warnings =
             migration?.warnings.map((warning) => `Not migrated: ${warning}`) ??
             [];
-          if (
-            migration &&
-            ((!migration.changed && migration.usesGetters) ||
-              migration.constructsClient)
-          ) {
-            notMigrated.push(remoteComponent.machineName);
+          if (migration && !migration.changed && migration.usesGetters) {
+            unmigratedGetters.push(remoteComponent.machineName);
+          }
+          if (migration?.constructsClient) {
+            legacyClients.push(remoteComponent.machineName);
           }
 
           if (discovered) {
@@ -582,9 +582,18 @@ export function createComponentsPullTask(
           );
         }
       }
-      if (notMigrated.length > 0) {
+      if (unmigratedGetters.length > 0) {
         notes.push(
-          `Components still using getPageData()/getSiteData()/new JsonApiClient() (not migrated automatically): ${notMigrated.join(', ')}`,
+          `Components with getter calls left unchanged: ${unmigratedGetters.join(', ')}`,
+        );
+      }
+      if (legacyClients.length > 0) {
+        notes.push(
+          `Components still constructing \`new JsonApiClient()\`: ${legacyClients.join(', ')}`,
+        );
+      }
+      if (unmigratedGetters.length > 0 || legacyClients.length > 0) {
+        notes.push(
           `Migration prompt for AI agents: ${GETTER_MIGRATION_PROMPT}`,
         );
       }
