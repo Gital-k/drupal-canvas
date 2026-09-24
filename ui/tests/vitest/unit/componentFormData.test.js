@@ -48,8 +48,9 @@ describe('componentFormData - getPropsValues propSource fallback', () => {
   };
 
   it('does not drop the value when source[key] is missing', () => {
-    // Simulates a freshly-evaluated model where `date_time` has not been
-    // saved yet, so the backend has stripped it from `source`.
+    // Simulates a freshly-evaluated model where `date_time` has an empty
+    // default value and has not been saved yet, so the backend has
+    // stripped it from `source`.
     const inputAndUiData = {
       selectedComponent,
       selectedComponentType,
