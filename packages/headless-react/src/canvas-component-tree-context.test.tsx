@@ -10,6 +10,7 @@ import {
 } from 'drupal-canvas/react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fetchPage } from '@drupal-canvas/headless/server';
 
 import { CanvasComponentTree } from './canvas-component-tree';
 
@@ -132,6 +133,41 @@ describe('CanvasComponentTree context and client', () => {
         </CanvasContextProvider>,
       ),
     ).toContain('no-page|Tree site|');
+  });
+
+  it('renders a normalized Canvas 1.11 response without borrowing head or outer context', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Release-shaped wire response: context is absent, not manually null-filled.
+    const page = await fetchPage('/', {
+      baseUrl: 'https://drupal.example',
+      fetchImpl: vi.fn().mockResolvedValue(
+        Response.json({
+          content: tree,
+          head: { title: 'Legacy head title' },
+          route: {
+            name: 'view.frontpage.page_1',
+            requestUri: '/',
+            params: [],
+            managedByCanvas: false,
+            entity: null,
+          },
+        }),
+      ),
+    });
+    if (!page || !('context' in page)) throw new Error('Expected a page');
+    const html = renderToStaticMarkup(
+      <CanvasContextProvider context={outerContext}>
+        <CanvasComponentTree
+          tree={page.content}
+          context={page.context}
+          components={{ header: Header }}
+        />
+      </CanvasContextProvider>,
+    );
+    expect(html).toContain('no-page|no-site|no-client');
+    expect(html).not.toContain('Legacy head title');
+    expect(html).not.toContain('From outer');
+    expect(html).not.toContain('Outer site');
   });
 
   it('creates a client from the runtime configuration and inherits an outer client otherwise', () => {
