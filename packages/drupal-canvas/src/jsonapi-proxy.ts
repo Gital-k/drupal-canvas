@@ -135,8 +135,22 @@ export interface ResolvedJsonApiProxyPath {
   path: string;
 }
 
-/** Drupal language codes as they appear in URL path prefixes. */
-const LANGUAGE_PREFIX_PATTERN = /^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8})?$/;
+/**
+ * A possible language prefix is one safe path segment, not a language code.
+ * Drupal permits custom text (but no slash); this is not a configuration lookup.
+ * Reject ambiguous escapes and URL delimiters before allowing an extra segment
+ * in front of the configured endpoint. Never decode the forwarded path itself.
+ */
+function isSafeOptionalPrefix(segment: string): boolean {
+  try {
+    const decoded = decodeURIComponent(segment);
+    return (
+      decoded !== '.' && decoded !== '..' && !/[/\\%?#\p{Cc}]/u.test(decoded)
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** Strips surrounding slashes. */
 export function trimSlashes(value: string): string {
@@ -196,7 +210,7 @@ export function resolveJsonApiProxyPath(
   );
   const segments = path.slice(1).split('/').filter(Boolean);
   const candidates = [segments];
-  if (segments.length > 1 && LANGUAGE_PREFIX_PATTERN.test(segments[0])) {
+  if (segments.length > 1 && isSafeOptionalPrefix(segments[0])) {
     candidates.push(segments.slice(1));
   }
   for (const candidate of candidates) {
@@ -299,7 +313,15 @@ export function mapJsonApiRequestToProxy(
     const resolved = resolveJsonApiProxyPath(relative.path, endpoints);
     if (
       resolved !== null &&
-      (target.endpoint === null || resolved.endpoint === target.endpoint)
+      (target.endpoint === null || resolved.endpoint === target.endpoint) &&
+      // Without a known foreign site root, no optional segment may precede
+      // its configured API mount (the direct client enforces the same rule).
+      (resolved.endpoint !== 'jsonapi' ||
+        api.siteKnown ||
+        matchesPrefix(
+          splitSegments(resolved.path),
+          splitSegments(api.apiPrefix),
+        ))
     ) {
       return `${options.proxyUrl.replace(/\/+$/, '')}${resolved.path}${relative.search}`;
     }
@@ -339,7 +361,15 @@ export function mapProxyPathToUpstream(
     apiPrefix: api.apiPrefix,
     routerPrefix: options.routerPrefix,
   });
-  if (resolved === null) {
+  if (
+    resolved === null ||
+    (resolved.endpoint === 'jsonapi' &&
+      !api.siteKnown &&
+      !matchesPrefix(
+        splitSegments(resolved.path),
+        splitSegments(api.apiPrefix),
+      ))
+  ) {
     return null;
   }
   const upstreamBase =

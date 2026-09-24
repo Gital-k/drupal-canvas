@@ -525,6 +525,42 @@ describe('createJsonApiClient', () => {
     ]);
   });
 
+  it.each([false, true])(
+    'uses arbitrary language prefixes directly and through the proxy (foreign API: %s)',
+    async (foreign) => {
+      const apiSite = foreign
+        ? 'https://api.example/mount'
+        : 'https://drupal.example/sub';
+      for (const proxyUrl of [undefined, '/custom/proxy']) {
+        const transport = fakeFetch((url) =>
+          url.includes('translate-path')
+            ? jsonResponse({ message: 'not found' }, { status: 404 })
+            : jsonResponse({ data: [] }),
+        );
+        const client = createJsonApiClient({
+          baseUrl: 'https://drupal.example/sub',
+          apiUrl: `${apiSite}/api/v1`,
+          ...(foreign ? { apiSiteUrl: apiSite } : {}),
+          proxyUrl,
+          serializer: null,
+          fetch: transport.fetch,
+        });
+        await client.getCollection('node--page', { locale: 'deutsch' });
+        await client.getView('content--page_1', { locale: 'deutsch' });
+        await client.getResourceByPath('/about', { locale: 'deutsch' });
+        await client.fetch(
+          `${apiSite}/deutsch/api/v1/node/page?page[offset]=3`,
+        );
+        expect(transport.calls.map((call) => call.url)).toEqual([
+          `${proxyUrl ?? apiSite}/deutsch/api/v1/node/page`,
+          `${proxyUrl ?? apiSite}/deutsch/api/v1/views/content/page_1`,
+          `${proxyUrl ?? 'https://drupal.example/sub'}/deutsch/router/translate-path?path=/about`,
+          `${proxyUrl ?? apiSite}/deutsch/api/v1/node/page?page[offset]=3`,
+        ]);
+      }
+    },
+  );
+
   it('keeps the site path and puts the locale between it and the prefix, for every method and the router', async () => {
     const { fetch, calls } = fakeFetch((url) =>
       url.includes('translate-path')

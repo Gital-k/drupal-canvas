@@ -34,6 +34,39 @@ describe('proxy path resolution', () => {
     );
   });
 
+  it.each(['deutsch', 'custom_123', 'fran%C3%A7ais'])(
+    'accepts a custom single-segment language prefix: %s',
+    (prefix) => {
+      expect(
+        resolveJsonApiProxyPath(`/${prefix}/jsonapi/node/article`),
+      ).toEqual({
+        endpoint: 'jsonapi',
+        path: `/${prefix}/jsonapi/node/article`,
+      });
+      expect(
+        resolveJsonApiProxyPath(`/${prefix}/router/translate-path`)?.endpoint,
+      ).toBe('router');
+    },
+  );
+
+  it.each([
+    '/deutsch/other/jsonapi/node',
+    '/deutsch/jsonapiX/node',
+    '/deutsch/user/login',
+    '/deutsch/routerX/translate-path',
+    '/%2e/jsonapi/node',
+    '/%2e%2e/jsonapi/node',
+    '/deutsch%2fother/jsonapi/node',
+    '/deutsch%5cother/jsonapi/node',
+    '/deutsch%252fother/jsonapi/node',
+    '/%/jsonapi/node',
+    '/%00/jsonapi/node',
+    '/admin%3Fquery/jsonapi/node',
+    '/admin%23fragment/jsonapi/node',
+  ])('rejects malformed prefixes or non-endpoints: %s', (path) => {
+    expect(resolveJsonApiProxyPath(path)).toBeNull();
+  });
+
   it('honors custom prefixes, including multi-segment ones', () => {
     expect(
       resolveJsonApiProxyPath('/api/node/article', { apiPrefix: 'api' })
@@ -56,8 +89,11 @@ describe('proxy path resolution', () => {
     expect(resolveJsonApiProxyPath('/oauth/token')).toBeNull();
     expect(resolveJsonApiProxyPath('/user/login')).toBeNull();
     expect(resolveJsonApiProxyPath('/jsonapiX/node')).toBeNull();
-    expect(resolveJsonApiProxyPath('/canvas/jsonapi/node')).toBeNull();
-    // One leading segment shaped like a Drupal language code is tolerated.
+    // This is an endpoint allowlist, not a lookup of configured languages.
+    expect(resolveJsonApiProxyPath('/canvas/jsonapi/node')?.endpoint).toBe(
+      'jsonapi',
+    );
+    // Any one safe leading segment can be a configured language prefix.
     expect(resolveJsonApiProxyPath('/foo/jsonapi/node')?.endpoint).toBe(
       'jsonapi',
     );
@@ -221,6 +257,67 @@ describe('proxy path resolution', () => {
       ),
     ).toBeNull();
   });
+
+  it.each([
+    {
+      baseUrl: 'https://drupal.example/sub',
+      apiPrefix: 'api/v1',
+      routerPrefix: 'paths/translate',
+    },
+    {
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://drupal.example/sub/api/v1',
+    },
+    {
+      baseUrl: 'https://drupal.example/sub',
+      apiUrl: 'https://api.example/mount/api/v1',
+      apiSiteUrl: 'https://api.example/mount',
+    },
+  ])(
+    'round-trips custom language prefixes at the configured site roots: %j',
+    (config) => {
+      const options = { ...config, proxyUrl: '/custom/proxy' };
+      const apiBase =
+        'apiSiteUrl' in config ? config.apiSiteUrl : config.baseUrl;
+      for (const [base, endpoint, tail] of [
+        [apiBase, 'jsonapi', 'api/v1/node/article'],
+        [
+          config.baseUrl,
+          'router',
+          config.routerPrefix ?? 'router/translate-path',
+        ],
+      ]) {
+        const path = `/deutsch/${tail}`;
+        const upstream = `${base}${path}`;
+        expect(
+          mapJsonApiRequestToProxy(`${upstream}?page[limit]=3`, options),
+        ).toBe(`/custom/proxy${path}?page[limit]=3`);
+        expect(mapProxyPathToUpstream(`/custom/proxy${path}`, options)).toEqual(
+          { url: upstream, endpoint },
+        );
+      }
+    },
+  );
+
+  it.each(['de', 'deutsch'])(
+    'does not guess a foreign API site root for %s',
+    (prefix) => {
+      const options = {
+        baseUrl: 'https://drupal.example/sub',
+        apiUrl: 'https://api.example/mount/api',
+        proxyUrl: '/proxy',
+      };
+      expect(() =>
+        mapJsonApiRequestToProxy(
+          `https://api.example/${prefix}/mount/api/node`,
+          options,
+        ),
+      ).toThrow();
+      expect(
+        mapProxyPathToUpstream(`/proxy/${prefix}/mount/api/node`, options),
+      ).toBeNull();
+    },
+  );
 
   it('maps upstream URLs to the proxy and back', () => {
     const options = {
