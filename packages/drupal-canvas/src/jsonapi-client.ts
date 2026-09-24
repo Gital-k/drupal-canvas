@@ -425,7 +425,7 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
     }
     return viewName
       ? `${prefixUrl}/views/${viewName}/${viewDisplayId}${query}`
-      : `${prefixUrl}/${entityTypeId}/${bundleId}${resourceId ? `/${resourceId}` : ''}${query}`;
+      : `${prefixUrl}/${entityTypeId}${bundleId ? `/${bundleId}` : ''}${resourceId ? `/${resourceId}` : ''}${query}`;
   }
 
   /**
