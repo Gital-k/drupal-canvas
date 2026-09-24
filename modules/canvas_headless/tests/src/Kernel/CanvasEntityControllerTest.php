@@ -411,7 +411,9 @@ final class CanvasEntityControllerTest extends CanvasKernelTestBase {
       self::assertContains('user.permissions', $exception->getCacheContexts());
     }
 
-    $this->editor->addRole($this->createRole(['view own unpublished content']))->save();
+    $role = $this->createRole(['view own unpublished content']);
+    self::assertIsString($role);
+    $this->editor->addRole($role)->save();
     $node->setOwnerId((int) $this->editor->id())->save();
     $this->setCurrentAccount($this->createTokenAccount(with_preview_scope: TRUE));
     $result = $this->renderEntity($node, exclude_auto_save: 'true');

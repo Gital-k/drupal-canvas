@@ -176,6 +176,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
 
     // Burn uid 1, which bypasses access checks.
     $this->createUser();
+    /** @var \Drupal\user\UserInterface $editor */
     $editor = $this->createUser([
       'access content',
       PageVariant::ADMIN_PERMISSION,
@@ -1114,6 +1115,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests exact revisions of different entity types through the content API.
    */
   public function testEntityRevisions(): void {
+    /** @var \Drupal\user\UserInterface $editor */
     $editor = $this->createUser(['access content', 'view all revisions']);
     $this->setCurrentAccount($editor);
     $component = Component::load(self::COMPONENT_ID);
@@ -1156,6 +1158,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     self::assertSame('First revision', $data['head']['title']);
     self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
 
+    /** @var \Drupal\user\UserInterface $reader */
     $reader = $this->createUser(['access content']);
     $this->setCurrentAccount($this->createTokenAccount(TRUE, $reader));
     try {
@@ -1170,6 +1173,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $this->installEntitySchema('content_moderation_state');
     $this->addEntityTypeAndBundleToWorkflow($this->createEditorialWorkflow(), 'node', 'article');
     $this->container->get(RouteBuilderInterface::class)->rebuild();
+    /** @var \Drupal\user\UserInterface $moderator */
     $moderator = $this->createUser([
       'access content',
       'view all revisions',
@@ -1216,6 +1220,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $this->installConfig(['taxonomy']);
     Vocabulary::create(['vid' => 'topics', 'name' => 'Topics'])->save();
     $this->container->get(RouteBuilderInterface::class)->rebuild();
+    /** @var \Drupal\user\UserInterface $term_editor */
     $term_editor = $this->createUser(['access content', 'view term revisions in topics']);
     $this->setCurrentAccount($term_editor);
     ContentTemplate::create([
@@ -1265,6 +1270,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
    * Tests private unsaved form previews through the content API.
    */
   public function testEntityPreviews(): void {
+    /** @var \Drupal\user\UserInterface $editor */
     $editor = $this->createUser(['access content', 'create article content', 'edit any article content', 'view all revisions']);
     $this->setCurrentAccount($editor);
     $component = Component::load(self::COMPONENT_ID);
@@ -1362,6 +1368,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     }
 
     // Owning a private preview does not grant create/update access.
+    /** @var \Drupal\user\UserInterface $reader */
     $reader = $this->createUser(['access content']);
     $this->setCurrentAccount($reader);
     foreach ([$node, $new_node] as $denied_node) {
@@ -1520,6 +1527,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       self::assertContains('user.permissions', $exception->getCacheContexts());
     }
 
+    /** @var \Drupal\user\UserInterface $author */
     $author = $this->createUser(['access content', 'view own unpublished content']);
     $node = Node::create(['type' => 'article', 'title' => 'Private stored title', 'uid' => $author->id(), 'status' => FALSE]);
     $node->save();
