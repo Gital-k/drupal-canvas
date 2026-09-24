@@ -80,6 +80,92 @@ function proxyRequest(
 }
 
 describe('JSON:API proxy', () => {
+  it.each([false, true])(
+    'forwards custom language prefixes with unchanged session/header boundaries (draft: %s)',
+    async (enabled) => {
+      const { handler, fetchImpl } = makeHarness(
+        { enabled, draftData: enabled ? liveDraftData() : null },
+        undefined,
+        {
+          ...CONFIG,
+          baseUrl: 'https://drupal.example/sub',
+          jsonApiUrl: 'https://api.example/mount/api/v1',
+          jsonApiSiteUrl: 'https://api.example/mount',
+          jsonApiProxyPath: '/custom/proxy',
+        },
+      );
+      for (const [path, url] of [
+        [
+          '/deutsch/api/v1/node/article',
+          'https://api.example/mount/deutsch/api/v1/node/article',
+        ],
+        [
+          '/deutsch/router/translate-path',
+          'https://drupal.example/sub/deutsch/router/translate-path',
+        ],
+      ]) {
+        const response = await handler(
+          proxyRequest(`/custom/proxy${path}?x=1`, {
+            headers: {
+              authorization: 'Bearer browser-token',
+              cookie: 'browser=secret',
+            },
+          }),
+        );
+        expect(response.status).toBe(200);
+        expect(response.headers.has('set-cookie')).toBe(false);
+        const [sentUrl, init] = fetchImpl.mock.calls.at(-1)!;
+        expect(sentUrl).toBe(`${url}?x=1`);
+        const headers = new Headers(init.headers);
+        expect(headers.get('authorization')).toBe(
+          enabled ? 'Bearer secret-token' : null,
+        );
+        expect(headers.has('cookie')).toBe(false);
+        expect(init.redirect).toBe('manual');
+        if (enabled)
+          expect(response.headers.get('cache-control')).toBe(
+            'private, no-store',
+          );
+      }
+    },
+  );
+
+  it.each(['deutsch/jsonapi/../oauth/token', 'deutsch%252fother/jsonapi/node'])(
+    'never fetches a malformed or non-endpoint prefixed path: %s',
+    async (path) => {
+      const { handler, fetchImpl } = makeHarness({
+        enabled: true,
+        draftData: liveDraftData(),
+      });
+      const response = await handler(
+        proxyRequest(`/api/canvas/jsonapi/${path}`),
+      );
+      expect(response.status).toBe(404);
+      expect(fetchImpl).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ['/deutsch/jsonapi/node/article', 302],
+    ['/deutsch/user/login', 502],
+  ] as const)(
+    'keeps redirected custom prefixes inside the endpoint allowlist: %s',
+    async (location, status) => {
+      const { handler, fetchImpl } = makeHarness(
+        { enabled: false, draftData: null },
+        () => new Response(null, { status: 302, headers: { location } }),
+      );
+      const response = await handler(
+        proxyRequest('/api/canvas/jsonapi/deutsch/jsonapi/node'),
+      );
+      expect(response.status).toBe(status);
+      expect(response.headers.get('location')).toBe(
+        status === 302 ? `/api/canvas/jsonapi${location}` : null,
+      );
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it('forwards public requests unauthenticated and keeps them on the backend', async () => {
     const { handler, fetchImpl } = makeHarness({
       enabled: false,
@@ -261,7 +347,12 @@ describe('JSON:API proxy', () => {
           proxyRequest('/api/canvas/jsonapi/mount/api/node/article'),
         )
       ).status,
-    ).toBe(404);
+    ).toBe(200);
+    // A language prefix may itself be named "mount". It stays UNDER the
+    // configured installation; it cannot replace or escape that base path.
+    expect(fetchImpl.mock.calls[2][0]).toBe(
+      'https://api.example/mount/mount/api/node/article',
+    );
   });
 
   it('surfaces a rejected session token as a session error and keeps resource denials', async () => {
