@@ -37,6 +37,7 @@ import type { BaseUrl, Cache } from '@drupal-api-client/api-client';
 import type {
   GetOptions,
   JsonApiClientOptions,
+  RawApiResponseWithData,
 } from '@drupal-api-client/json-api-client';
 import type { ResolvedJsonApiBase } from './jsonapi-proxy.js';
 
@@ -466,7 +467,22 @@ export class CanvasJsonApiClient extends UpstreamJsonApiClient {
    * collections. Working copies are merged into the raw document before the
    * serializer runs. A failing ordinary item fetch keeps the original item;
    * draft-session errors propagate. Raw responses bypass this.
+   *
+   * An omitted or false rawResponse returns the deserialized T. A literal
+   * true returns the response wrapper; a dynamic flag retains both types.
    */
+  override getCollection<T>(
+    type: string,
+    options: GetOptions & { rawResponse: true },
+  ): Promise<RawApiResponseWithData<T>>;
+  override getCollection<T>(
+    type: string,
+    options?: GetOptions & { rawResponse?: false },
+  ): Promise<T>;
+  override getCollection<T>(
+    type: string,
+    options?: GetOptions,
+  ): Promise<T | RawApiResponseWithData<T>>;
   override async getCollection<T>(type: string, options?: GetOptions) {
     if (this.resourceVersion === null || options?.rawResponse) {
       return super.getCollection<T>(type, options);
