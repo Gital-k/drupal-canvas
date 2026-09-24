@@ -903,7 +903,9 @@ export default function Example() {
         report.match(/`new JsonApiClient\(\)` is not migrated automatically/g),
       ).toHaveLength(1);
       expect(outcome.notes).toContainEqual(
-        expect.stringContaining('not migrated automatically): nullable'),
+        expect.stringContaining(
+          'Components with getter calls left unchanged: nullable',
+        ),
       );
     });
 
@@ -957,7 +959,9 @@ export default function Example() {
         'Not migrated: `getPageData()` is called after a possible early return',
       );
       expect(outcome.notes).toEqual([
-        expect.stringContaining('not migrated automatically): crumbs'),
+        expect.stringContaining(
+          'Components with getter calls left unchanged: crumbs',
+        ),
         expect.stringContaining('Migration prompt for AI agents:'),
         expect.stringContaining('nullable results'),
       ]);
@@ -1015,6 +1019,17 @@ const client = new JsonApiClient();
 export default function Header() {
   const page = getPageData();
   return <h1>{page.pageTitle}</h1>;
+}`,
+        true,
+      ],
+      [
+        'both-getters',
+        `import { getPageData, getSiteData, JsonApiClient } from 'drupal-canvas';
+const client = new JsonApiClient();
+export default function Header() {
+  const page = getPageData();
+  const site = getSiteData();
+  return <h1>{page?.pageTitle}{site?.branding.siteName}</h1>;
 }`,
         true,
       ],
@@ -1088,13 +1103,26 @@ export default function Header() { return <h1>{page.pageTitle}</h1>; }`,
         if (converted)
           expect(report).toContain('Migrated getPageData() → usePageContext()');
         if (name === 'unsafe-mixed') expect(report).toContain('module level');
-        expect(
-          outcome.notes?.filter((note) =>
-            note.includes('not migrated automatically):'),
-          ),
-        ).toEqual([
-          expect.stringContaining(`not migrated automatically): ${name}`),
-        ]);
+        expect(outcome.notes).toContain(
+          `Components still constructing \`new JsonApiClient()\`: ${name}`,
+        );
+        const getterNotes = outcome.notes?.filter((note) =>
+          note.startsWith('Components with getter calls left unchanged:'),
+        );
+        expect(getterNotes).toEqual(
+          name === 'unsafe-mixed'
+            ? [`Components with getter calls left unchanged: ${name}`]
+            : [],
+        );
+        const notes = outcome.notes?.join('\n');
+        expect(notes).not.toMatch(/getPageData|getSiteData/);
+        expect(notes).toContain('remain supported in Drupal and Workbench');
+        expect(notes).toContain('For headless use, migrate only the remaining');
+        if (name === 'both-getters') {
+          expect(written).toContain('const site = useSiteContext();');
+          expect(written).not.toMatch(/getPageData|getSiteData/);
+          expect(report).toContain('getSiteData() → useSiteContext()');
+        }
         expect(
           outcome.notes?.filter((note) =>
             note.startsWith('Migration prompt for AI agents:'),
