@@ -467,7 +467,7 @@ export function createComponentsPullTask(
     }): Promise<PullTaskResult> {
       const results: Result[] = [];
       const notes: string[] = [];
-      const unmigratedGetters: string[] = [];
+      const remainingGetterComponents: string[] = [];
       const legacyClients: string[] = [];
       let migratedAny = false;
 
@@ -505,7 +505,7 @@ export function createComponentsPullTask(
             migration?.warnings.map((warning) => `Not migrated: ${warning}`) ??
             [];
           if (migration && !migration.changed && migration.usesGetters) {
-            unmigratedGetters.push(remoteComponent.machineName);
+            remainingGetterComponents.push(remoteComponent.machineName);
           }
           if (migration?.constructsClient) {
             legacyClients.push(remoteComponent.machineName);
@@ -582,9 +582,9 @@ export function createComponentsPullTask(
           );
         }
       }
-      if (unmigratedGetters.length > 0) {
+      if (remainingGetterComponents.length > 0) {
         notes.push(
-          `Components with getter calls left unchanged: ${unmigratedGetters.join(', ')}`,
+          `Components with getter calls left unchanged: ${remainingGetterComponents.join(', ')}`,
         );
       }
       if (legacyClients.length > 0) {
@@ -592,7 +592,7 @@ export function createComponentsPullTask(
           `Components still constructing \`new JsonApiClient()\`: ${legacyClients.join(', ')}`,
         );
       }
-      if (unmigratedGetters.length > 0 || legacyClients.length > 0) {
+      if (remainingGetterComponents.length > 0 || legacyClients.length > 0) {
         notes.push(
           `Migration prompt for AI agents: ${GETTER_MIGRATION_PROMPT}`,
         );
