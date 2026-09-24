@@ -37,9 +37,8 @@ test.describe('Date formatting Twig filters', () => {
 
     // Wait for the date prop's save round-trip to complete before filling
     // the next date/date-time field.
-    await page.waitForFunction(
-      () =>
-        !document.body.hasAttribute('data-canvas-layout-request-in-progress'),
+    await expect(page.locator('body')).not.toHaveAttribute(
+      'data-canvas-layout-request-in-progress',
     );
 
     // Set a known datetime value.
