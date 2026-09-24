@@ -126,6 +126,14 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Headless',
+          items: [
+            { label: 'Introduction', slug: 'headless' },
+            { label: 'Setup', slug: 'headless/setup' },
+            { label: 'FAQ', slug: 'headless/faq' },
+          ],
+        },
+        {
           label: 'SDC components',
           items: [
             { label: 'Introduction', slug: 'sdc-components' },
@@ -158,14 +166,6 @@ export default defineConfig({
             { label: 'Introduction', slug: 'apis' },
             { label: 'Customizing forms', slug: 'apis/customizing-forms' },
             { label: 'Theme settings', slug: 'apis/theme-settings' },
-          ],
-        },
-        {
-          label: 'Headless',
-          items: [
-            { label: 'Introduction', slug: 'headless' },
-            { label: 'Setup', slug: 'headless/setup' },
-            { label: 'FAQ', slug: 'headless/faq' },
           ],
         }
       ],
