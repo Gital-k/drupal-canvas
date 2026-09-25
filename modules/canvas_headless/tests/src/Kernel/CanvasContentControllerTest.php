@@ -1267,10 +1267,15 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests private unsaved form previews on mono- and multilingual sites.
+   * Tests private unsaved form previews with language and Metatag support.
    */
   #[DataProvider('entityPreviewLanguages')]
-  public function testEntityPreviews(bool $multilingual): void {
+  public function testEntityPreviews(bool $multilingual, bool $metatag): void {
+    if ($metatag) {
+      $this->enableModules(['token', 'metatag']);
+      $this->installConfig(['metatag']);
+      $this->config('system.site')->set('name', 'Preview site')->save();
+    }
     if ($multilingual) {
       ConfigurableLanguage::createFromLangcode('fr')->save();
       $this->config('language.negotiation')
@@ -1324,7 +1329,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       $data = self::responseData($response);
       self::assertTrue($data['route']['managedByCanvas']);
       self::assertStringContainsString('Unsaved form title', \json_encode($data['content'], JSON_THROW_ON_ERROR));
-      self::assertSame('Unsaved form title', $data['head']['title']);
+      self::assertSame($metatag ? 'Unsaved form title | Preview site' : 'Unsaved form title', $data['head']['title']);
       self::assertSame($multilingual ? ['en', 'fr'] : [], array_column($data['route']['translations'], 'langcode'));
       self::assertSame($multilingual ? ['/node/' . $node->id(), '/fr/node/' . $node->id()] : [], array_column($data['route']['translations'], 'url'));
       self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
@@ -1342,7 +1347,7 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       $data = self::responseData($response);
       self::assertTrue($data['route']['managedByCanvas']);
       self::assertStringContainsString('New unsaved node', \json_encode($data['content'], JSON_THROW_ON_ERROR));
-      self::assertSame('New unsaved node', $data['head']['title']);
+      self::assertSame(['title' => 'New unsaved node'], $data['head']);
       self::assertSame($langcode, $data['route']['negotiatedLanguage']);
       self::assertSame([], $data['route']['translations']);
       self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
@@ -1420,11 +1425,13 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Provides monolingual and multilingual site configurations for previews.
+   * Provides preview configurations with optional languages and Metatag.
    */
   public static function entityPreviewLanguages(): iterable {
-    yield 'monolingual' => [FALSE];
-    yield 'multilingual' => [TRUE];
+    yield 'monolingual' => [FALSE, FALSE];
+    yield 'multilingual' => [TRUE, FALSE];
+    yield 'monolingual with Metatag' => [FALSE, TRUE];
+    yield 'multilingual with Metatag' => [TRUE, TRUE];
   }
 
   /**
