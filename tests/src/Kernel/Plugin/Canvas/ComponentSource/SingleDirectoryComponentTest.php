@@ -7981,6 +7981,145 @@ HTML
   }
 
   /**
+   * Tests hydrateComponent() falls back for an empty required `type: array` prop.
+   *
+   * When a required multi-cardinality prop (minItems: 1) evaluates to [],
+   * hydrateComponent() must replace it with the resolved default value so the
+   * component still renders instead of throwing an InvalidComponentException.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::hydrateComponent()
+   */
+  public function testHydrateComponentFallsBackToDefaultForEmptyRequiredMultiCardinalityProp(): void {
+    $this->generateComponentConfig();
+
+    $component = Component::load('sdc.canvas_test_sdc.sparkline');
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+
+    // The user removed all items from the required `data` prop mid-edit.
+    $resolved = [
+      'data' => new EvaluationResult([]),
+    ];
+
+    $active_required_explicit_inputs = $component
+      ->loadVersion($component->getActiveVersion())
+      ->getComponentSource()
+      ->getDefaultExplicitInput(only_required: TRUE);
+
+    $hydrated = $source->hydrateComponent(
+      ['resolved' => $resolved],
+      [],
+      $active_required_explicit_inputs,
+    );
+
+    // The empty array must be replaced with a non-empty default value.
+    $data_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['data'];
+    $this->assertInstanceOf(EvaluationResult::class, $data_result);
+    $this->assertIsArray($data_result->value);
+    $this->assertNotEmpty($data_result->value);
+
+    // Rendering must succeed (no InvalidComponentException).
+    $build = $source->renderComponent($hydrated, $component->getSlotDefinitions(), 'test-uuid', TRUE);
+    $html = (string) $this->container->get('renderer')->renderInIsolation($build);
+    $this->assertStringContainsString('sparkline', $html);
+  }
+
+  /**
+   * Tests hydrateComponent() falls back to the metadata example for empty links.
+   *
+   * A `format: uri-reference` prop's example requires an entity and so cannot be
+   * stored as a StaticPropSource default (its default value is []). When such a
+   * required prop evaluates to [], hydrateComponent() must fall back to the
+   * component metadata example.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::hydrateComponent()
+   */
+  public function testHydrateComponentFallsBackToExampleForEmptyRequiredUrlMultiCardinalityProp(): void {
+    $this->generateComponentConfig();
+
+    $component = Component::load('sdc.canvas_test_sdc.required-links');
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+
+    // The user removed all link values from the required `links` prop mid-edit.
+    $resolved = [
+      'links' => new EvaluationResult([]),
+    ];
+
+    $active_required_explicit_inputs = $component
+      ->loadVersion($component->getActiveVersion())
+      ->getComponentSource()
+      ->getDefaultExplicitInput(only_required: TRUE);
+    // Precondition: the default value for a uri-reference prop is [].
+    $this->assertSame([], $active_required_explicit_inputs['links']['value'] ?? NULL);
+
+    $hydrated = $source->hydrateComponent(
+      ['resolved' => $resolved],
+      [],
+      $active_required_explicit_inputs,
+    );
+
+    // The empty array must be replaced with the metadata example.
+    $links_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
+    $this->assertInstanceOf(EvaluationResult::class, $links_result);
+    $this->assertSame(['/about', '/contact'], $links_result->value);
+
+    // Rendering must succeed (no InvalidComponentException).
+    $build = $source->renderComponent($hydrated, $component->getSlotDefinitions(), 'test-uuid', TRUE);
+    $html = (string) $this->container->get('renderer')->renderInIsolation($build);
+    $this->assertNotEmpty($html);
+  }
+
+  /**
+   * Tests hydrateComponent() falls back when array items are objects.
+   *
+   * When a required prop evaluates to an array of objects (e.g. a `link` field's
+   * raw `{uri, options}` structure) instead of strings, hydrateComponent() must
+   * detect the mismatch and fall back to the metadata example, preventing an
+   * "Object value found, but a string is required" InvalidComponentException.
+   *
+   * @see \Drupal\canvas\Plugin\Canvas\ComponentSource\GeneratedFieldExplicitInputUxComponentSourceBase::hydrateComponent()
+   */
+  public function testHydrateComponentFallsBackWhenArrayItemsAreObjects(): void {
+    $this->generateComponentConfig();
+
+    $component = Component::load('sdc.canvas_test_sdc.required-links');
+    $this->assertInstanceOf(Component::class, $component);
+
+    $source = $component->getComponentSource();
+
+    // The link field's raw structure leaked through instead of a URL string.
+    $resolved = [
+      'links' => new EvaluationResult([
+        ['uri' => 'https://example.com', 'options' => []],
+      ]),
+    ];
+
+    $active_required_explicit_inputs = $component
+      ->loadVersion($component->getActiveVersion())
+      ->getComponentSource()
+      ->getDefaultExplicitInput(only_required: TRUE);
+
+    $hydrated = $source->hydrateComponent(
+      ['resolved' => $resolved],
+      [],
+      $active_required_explicit_inputs,
+    );
+
+    // The object array must be replaced with the metadata example.
+    $links_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
+    $this->assertInstanceOf(EvaluationResult::class, $links_result);
+    $this->assertSame(['/about', '/contact'], $links_result->value);
+
+    // Rendering must succeed (no InvalidComponentException).
+    $build = $source->renderComponent($hydrated, $component->getSlotDefinitions(), 'test-uuid', TRUE);
+    $html = (string) $this->container->get('renderer')->renderInIsolation($build);
+    $this->assertNotEmpty($html);
+  }
+
+  /**
    * Tests required empty props: client model conversion and formal validation.
    *
    * ::clientModelToInput(): required free-form prose (plain `type: string` and
