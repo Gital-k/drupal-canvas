@@ -58,9 +58,9 @@ final class EvaluationResult implements CacheableDependencyInterface, Attachment
     CacheableDependencyInterface $cacheability = new CacheableMetadata(),
     array $attachments = [],
   ) {
-     if (!$value instanceof self && !self::hasNestedInstances($value)) {
-       \assert((\is_array($value) && !static::hasNestedInstances($value)) || $value instanceof EntityInterface || \is_string($value) || $value instanceof \Stringable || \is_int($value) || \is_float($value) || \is_bool($value) || \is_null($value));
-       $this->value = $value;
+    if (!$value instanceof self && !self::hasNestedInstances($value)) {
+      \assert((\is_array($value) && !static::hasNestedInstances($value)) || $value instanceof EntityInterface || \is_string($value) || $value instanceof \Stringable || \is_int($value) || \is_float($value) || \is_bool($value) || \is_null($value));
+      $this->value = $value;
       $this->setCacheability($cacheability);
       $this->attachments = $attachments;
       return;
