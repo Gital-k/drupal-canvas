@@ -165,11 +165,12 @@ explicit `jsonApi` prop replaces the configuration `CanvasRuntime` supplies.
 
 > **Required for SWR data in the initial HTML:** Server rendering a component
 > does not run its SWR fetcher. In the server page, obtain a client with
-> `await getClient()` and use it to prefetch the data. Pass that data as `fallback`
-> to a client `SWRConfig` wrapper around `CanvasComponentTree`, using the same
-> keys as the components' SWR hooks.
+> `await getClient()` and use it to prefetch the data. Pass that data as
+> `fallback` to a client `SWRConfig` wrapper around `CanvasComponentTree`, using
+> the same keys as the components' SWR hooks.
 
-See the [prefetch example in `@drupal-canvas/headless`](../headless/README.md#server-rendering-and-swr).
+See the
+[prefetch example in `@drupal-canvas/headless`](../headless/README.md#server-rendering-and-swr).
 SWR fetches in the browser after hydration.
 
 During server rendering the hook's client remains draft-aware so fallback data
