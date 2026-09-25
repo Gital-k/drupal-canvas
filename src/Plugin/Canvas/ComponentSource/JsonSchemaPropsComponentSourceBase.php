@@ -574,17 +574,18 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
           catch (\Throwable) {
             // Ignore: fall back to the component metadata example below.
           }
-          if ($resolved_default !== NULL && $resolved_default !== []) {
-            $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult($resolved_default);
-          }
-          elseif (\array_key_exists(0, $this->getMetadata()->schema['properties'][$prop]['examples'] ?? [])) {
-            // Entity-requiring props (e.g. `format: uri-reference` links,
-            // images) resolve to []: their example cannot be stored in the
-            // field type, so fall back to the component metadata example.
-            $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult(
-              $this->getMetadata()->schema['properties'][$prop]['examples'][0],
-            );
-          }
+           if ($resolved_default !== NULL && $resolved_default !== []) {
+             $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult($resolved_default);
+           }
+           else {
+             $examples = $this->getMetadata()->schema['properties'][$prop]['examples'] ?? [];
+             if (\array_key_exists(0, $examples)) {
+               // Entity-requiring props (e.g. `format: uri-reference` links,
+               // images) resolve to []: their example cannot be stored in the
+               // field type, so fall back to the component metadata example.
+               $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult($examples[0]);
+             }
+           }
         }
       }
     }
