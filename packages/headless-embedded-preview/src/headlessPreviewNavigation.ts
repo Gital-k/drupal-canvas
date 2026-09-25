@@ -3,6 +3,8 @@
  * Resolves headless frontend paths against Drupal's existing content API.
  */
 
+import { parsePreviewRequest } from '@drupal-canvas/headless-host';
+
 export interface DrupalPathResolverOptions {
   contentApiPath: string;
   drupalBasePath: string;
@@ -55,7 +57,10 @@ export function createDrupalPathResolver({
       return null;
     }
 
-    const frontendUrl = new URL(path, 'https://canvas.invalid');
+    const frontendUrl = new URL(
+      parsePreviewRequest(path).requestUri,
+      'https://canvas.invalid',
+    );
     let drupalPathname = frontendUrl.pathname;
     if (
       frontendBasePath &&
@@ -134,6 +139,10 @@ export function createDrupalHostNavigator({
       }
       if (!['http:', 'https:'].includes(frontendUrl.protocol)) {
         return;
+      }
+
+      if (frontendUrl.origin === frontendOrigin) {
+        frontendUrl = new URL(parsePreviewRequest(frontendUrl.href).requestUri);
       }
 
       let target = frontendUrl.toString();

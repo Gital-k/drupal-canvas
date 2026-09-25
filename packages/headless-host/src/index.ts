@@ -76,9 +76,13 @@ import {
   HEADLESS_STATUS_REQUEST_MESSAGE,
   HEADLESS_VIEWPORT_HEIGHT_MESSAGE,
   isCanvasGeometrySnapshot,
+  parsePreviewRequest,
+  withPreviewContext,
 } from '@drupal-canvas/headless';
 
 import type { CanvasGeometry } from '@drupal-canvas/headless';
+
+export type { PreviewContext } from '@drupal-canvas/headless';
 
 // The protocol message types are declared once, in @drupal-canvas/headless
 // (whose client entry implements the app side); re-exported here so host
@@ -100,6 +104,8 @@ export {
   HEADLESS_RENEW_REQUEST_MESSAGE,
   HEADLESS_STATUS_MESSAGE,
   HEADLESS_STATUS_REQUEST_MESSAGE,
+  parsePreviewRequest,
+  withPreviewContext,
 };
 
 /**

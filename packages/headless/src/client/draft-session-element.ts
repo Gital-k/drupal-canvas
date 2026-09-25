@@ -36,7 +36,8 @@
  * observed: a client-routed app (Nuxt, a Next.js page transition) keeps
  * the element alive across navigations, and the host must hear about the
  * current path — status reports and the renew link both carry it. Without
- * the attribute the path is read from window.location at connect time.
+ * the attribute the path and query string are read from window.location at
+ * connect time.
  *
  * Alongside the session machine, the element also runs a content-height
  * reporter (./height-report) for the same `editor-origin`: an independent
@@ -119,7 +120,9 @@ export class DraftSessionElement extends BaseElement {
       this.getAttribute('initial-expired') !== 'false';
     this.#renewUrl = this.getAttribute('renew-url');
     this.#embedded = window.self !== window.top;
-    this.#path = this.getAttribute('path') ?? window.location.pathname;
+    this.#path =
+      this.getAttribute('path') ??
+      window.location.pathname + window.location.search;
     this.#connected = true;
 
     this.#startEpoch();
@@ -159,7 +162,7 @@ export class DraftSessionElement extends BaseElement {
     if (!this.#connected || name !== 'path') {
       return;
     }
-    const path = newValue ?? window.location.pathname;
+    const path = newValue ?? window.location.pathname + window.location.search;
     if (path === this.#path) {
       return;
     }

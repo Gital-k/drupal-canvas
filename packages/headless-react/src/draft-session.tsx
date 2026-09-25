@@ -39,7 +39,7 @@ export interface DraftSessionSnapshot {
   embedded: boolean;
   expired: boolean;
   renewState: DraftSessionRenewState;
-  /** The current app path (for the renew link's ?path= parameter). */
+  /** The current app path and query string for the renew link. */
   path: string;
   renewUrl: string | null;
 }
@@ -60,8 +60,8 @@ export interface DraftSessionProps {
   /** The app endpoint that redeems a fresh assertion. */
   renewEndpoint?: string;
   /**
-   * The current app path, reported to the host and carried by the renew
-   * link. Framework wrappers bind their router's pathname; without it the
+   * The current app path and query string, reported to the host and carried
+   * by the renew link. Framework wrappers bind their router's URL; without it the
    * document's location at machine creation is used, which is correct only
    * until a client-side navigation.
    */
@@ -157,7 +157,7 @@ export function DraftSession({
       return;
     }
     if (!hasPathPropRef.current) {
-      pathRef.current = window.location.pathname;
+      pathRef.current = window.location.pathname + window.location.search;
     }
     const session = createDraftSession({
       tokenExpiresAt: effectiveExpiresAt,

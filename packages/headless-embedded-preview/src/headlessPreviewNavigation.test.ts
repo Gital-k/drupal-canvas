@@ -25,9 +25,24 @@ describe('Drupal preview behavior', () => {
     ['', true, '', '/app', ''],
     ['#details', true, '/cms', '/app', '?display=full&filter=a%20b'],
     ['#', true, '/cms/index.php', '', '?display=full'],
+    [
+      '#details',
+      true,
+      '/cms',
+      '/app',
+      '?display=full',
+      '&_canvas_language=pl&_canvas_viewMode=teaser&_canvas_pageVariant=alternate',
+    ],
   ] as const)(
     'authenticates and keeps fragments and controls in sync from "%s", node preview: %s',
-    async (fragment, nodePreview, drupalBasePath, frontendBasePath, query) => {
+    async (
+      fragment,
+      nodePreview,
+      drupalBasePath,
+      frontendBasePath,
+      query,
+      contextQuery: string = '',
+    ) => {
       vi.useFakeTimers();
       vi.resetModules();
       const userActivation = { hasBeenActive: false, isActive: false };
@@ -39,7 +54,9 @@ describe('Drupal preview behavior', () => {
         ? '/fr/node/preview/preview-uuid/full'
         : '/article';
       const hostPath = `${drupalBasePath}${path}${query}`;
-      const frontendUrl = `https://frontend.example${frontendBasePath}${path}${query}`;
+      const activationQuery = `${query}${query ? '&' : '?'}_canvas_excludeAutoSave=true`;
+      const savedQuery = `${query}${contextQuery}${query ? '&' : '?'}_canvas_excludeAutoSave=true`;
+      const frontendUrl = `https://frontend.example${frontendBasePath}${path}${savedQuery}`;
       window.history.replaceState(null, '', `${hostPath}${fragment}`);
       document.body.innerHTML = `
         ${nodePreview ? '<div class="node-preview-container"><a href="/node/1/edit">Back to content editing</a></div>' : ''}
@@ -75,7 +92,7 @@ describe('Drupal preview behavior', () => {
             drupalBasePath,
             frontendBasePath,
             frontendOrigin: 'https://frontend.example',
-            previewUrl: frontendUrl,
+            previewUrl: `https://frontend.example${frontendBasePath}${path}${query}${contextQuery}`,
           },
         },
       });
@@ -105,8 +122,7 @@ describe('Drupal preview behavior', () => {
           new URL(
             `${drupalBasePath}/canvas-headless/assertion?` +
               new URLSearchParams({
-                path: `${path}${query}${fragment}`,
-                exclude_auto_save: '1',
+                path: `${path}${activationQuery}${fragment}`,
               }),
             window.location.origin,
           ),
@@ -151,16 +167,15 @@ describe('Drupal preview behavior', () => {
         send({
           type: 'canvas-headless:renew-request',
           hostSessionId: handshake.hostSessionId,
-          path: '/another-page?display=teaser#heading',
+          path: '/another-page?display=teaser&_canvas_language=pl&_canvas_viewMode=teaser&_canvas_pageVariant=alternate&_canvas_excludeAutoSave=true#heading',
         });
         await vi.advanceTimersByTimeAsync(1);
         expect(fetchMock).toHaveBeenCalledWith(
           new URL(
             `${drupalBasePath}/canvas-headless/assertion?` +
               new URLSearchParams({
-                path: '/another-page?display=teaser#heading',
+                path: '/another-page?display=teaser&_canvas_language=pl&_canvas_viewMode=teaser&_canvas_pageVariant=alternate&_canvas_excludeAutoSave=true#heading',
                 renewal: '1',
-                exclude_auto_save: '1',
               }),
             window.location.origin,
           ),
@@ -203,6 +218,7 @@ describe('Drupal preview behavior', () => {
         });
         await vi.advanceTimersByTimeAsync(1);
         expect(window.location.hash).toBe('#comments');
+        expect(window.location.search).toBe(query);
         expect(iframe.contentWindow!.location.href).toBe(
           `${frontendUrl}#comments`,
         );
@@ -257,6 +273,23 @@ describe('Drupal preview behavior', () => {
         window.history.replaceState(null, '', `${hostPath}#`);
         window.dispatchEvent(new HashChangeEvent('hashchange'));
         expect(iframe.contentWindow!.location.href).toBe(`${frontendUrl}#`);
+
+        // Recovery uses a fresh URL carrying this host's saved-content choice.
+        send({
+          type: 'canvas-headless:status',
+          status: 'expired',
+          hostSessionId: handshake.hostSessionId,
+          path: `${path}${query}${contextQuery}#recovered`,
+        });
+        await vi.advanceTimersByTimeAsync(1);
+        expect(fetchMock).toHaveBeenCalledWith(
+          new URL(
+            `${drupalBasePath}/canvas-headless/assertion?` +
+              new URLSearchParams({ path: `${path}${savedQuery}#recovered` }),
+            window.location.origin,
+          ),
+          expect.objectContaining({ method: 'POST' }),
+        );
       } finally {
         behavior.detach(document, {}, 'unload');
       }
@@ -354,39 +387,48 @@ describe('headless preview availability', () => {
 });
 
 describe('headless preview Drupal path resolution', () => {
-  it('moves a Drupal-owned frontend path to the browser-facing Drupal URL', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
-      new Response('{}', {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    const resolvePath = createDrupalPathResolver({
-      contentApiPath: '/subdir/canvas/content-api',
-      drupalBasePath: '/subdir',
-      frontendBasePath: '/app',
-      locationOrigin: 'https://drupal.example',
-      fetchImpl,
-    });
+  it.each([
+    '',
+    '&_canvas_excludeAutoSave=true',
+    '&_canvas_excludeAutoSave=false',
+  ])(
+    'moves a Drupal-owned frontend path to Drupal without the preview parameter "%s"',
+    async (previewQuery) => {
+      const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+        new Response('{}', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+      const resolvePath = createDrupalPathResolver({
+        contentApiPath: '/subdir/canvas/content-api',
+        drupalBasePath: '/subdir',
+        frontendBasePath: '/app',
+        locationOrigin: 'https://drupal.example',
+        fetchImpl,
+      });
 
-    await expect(resolvePath('/app/node/123?view=full#details')).resolves.toBe(
-      'https://drupal.example/subdir/node/123?view=full#details',
-    );
-    await expect(resolvePath('/app/node/123#')).resolves.toBe(
-      'https://drupal.example/subdir/node/123#',
-    );
-    expect(fetchImpl).toHaveBeenCalledWith(
-      new URL(
-        'https://drupal.example/subdir/canvas/content-api?requestUri=%2Fnode%2F123%3Fview%3Dfull',
-      ),
-      expect.objectContaining({
-        cache: 'no-store',
-        credentials: 'same-origin',
-        headers: { Accept: 'application/json' },
-        signal: expect.any(AbortSignal),
-      }),
-    );
-  });
+      await expect(
+        resolvePath(`/app/node/123?view=full${previewQuery}#details`),
+      ).resolves.toBe(
+        'https://drupal.example/subdir/node/123?view=full#details',
+      );
+      await expect(resolvePath('/app/node/123#')).resolves.toBe(
+        'https://drupal.example/subdir/node/123#',
+      );
+      expect(fetchImpl).toHaveBeenCalledWith(
+        new URL(
+          'https://drupal.example/subdir/canvas/content-api?requestUri=%2Fnode%2F123%3Fview%3Dfull',
+        ),
+        expect.objectContaining({
+          cache: 'no-store',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
+          signal: expect.any(AbortSignal),
+        }),
+      );
+    },
+  );
 
   it('leaves the path with the frontend when Drupal does not resolve it', async () => {
     const resolvePath = createDrupalPathResolver({
@@ -462,7 +504,7 @@ describe('headless preview host navigation', () => {
     });
 
     await navigator.navigate(
-      'https://frontend.example/node/123?view=full#details',
+      'https://frontend.example/node/123?view=full&_canvas_excludeAutoSave=true#details',
     );
 
     expect(resolveDrupalPath).toHaveBeenCalledExactlyOnceWith(
@@ -514,7 +556,9 @@ describe('headless preview host navigation', () => {
         setNavigationTimer,
       });
 
-      const navigation = navigator.navigate('https://frontend.example/catalog');
+      const navigation = navigator.navigate(
+        'https://frontend.example/catalog?_canvas_excludeAutoSave=true',
+      );
       if (failure === 'timeout') await vi.advanceTimersByTimeAsync(4_000);
       await expect(navigation).resolves.toBeUndefined();
 

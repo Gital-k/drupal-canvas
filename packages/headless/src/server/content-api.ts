@@ -10,10 +10,12 @@
 
 import { CANVAS_COMPONENT_PREVIEW_QUERY } from '../constants';
 import { isPageRedirect } from '../page';
+import { parsePreviewRequest, withPreviewContext } from '../preview-context';
 import { getSessionToken } from '../token';
 
 import type { DraftData } from '../draft-data';
 import type { PageResult } from '../page';
+import type { PreviewContext } from '../preview-context';
 
 /**
  * Fetches a page by its Drupal request URI (e.g. `/node/4?view=full`).
@@ -24,8 +26,10 @@ import type { PageResult } from '../page';
  * the request is anonymous and resolves only what anonymous visitors may
  * see. Returns null for anything the current access level cannot see
  * (403/404).
- * A live session can exclude Canvas auto-saves with excludeAutoSave: true
- * in its signed preview context, without changing the editor's permissions.
+ * Rendering choices travel in this request URI or the explicit previewContext
+ * option. The SDK strips reserved preview parameters before Drupal resolves
+ * the route and forwards context only with a live session. Cookies supply
+ * authorization, never rendering context.
  *
  * Drupal's route selects the entity to render;
  * the endpoint has no notion of JSON:API's resourceVersion.
@@ -36,6 +40,7 @@ export async function fetchPage(
     baseUrl: string;
     draftData?: DraftData | null;
     componentPreviewId?: string;
+    previewContext?: PreviewContext;
     fetchImpl?: typeof fetch;
   },
 ): Promise<PageResult | null> {
@@ -53,25 +58,28 @@ export async function fetchPage(
   }
 
   const url = new URL(`${baseUrl.replace(/\/$/, '')}/canvas/content-api`);
-  url.searchParams.set('requestUri', requestUri);
+  const previewRequest = parsePreviewRequest(requestUri);
+  url.searchParams.set('requestUri', previewRequest.requestUri);
   if (componentPreviewId) {
     url.searchParams.set(CANVAS_COMPONENT_PREVIEW_QUERY, componentPreviewId);
   }
-  const pageVariantPreviewId =
-    !componentPreviewId && liveDraft
-      ? draftData?.previewContext?.pageVariant
-      : undefined;
-  if (liveDraft && draftData?.previewContext?.excludeAutoSave === true) {
-    url.searchParams.set('excludeAutoSave', 'true');
-  }
-  if (liveDraft && draftData?.previewContext?.language) {
-    url.searchParams.set('language', draftData.previewContext.language);
-  }
-  if (liveDraft && draftData?.previewContext?.viewMode) {
-    url.searchParams.set('viewMode', draftData.previewContext.viewMode);
-  }
-  if (pageVariantPreviewId) {
-    url.searchParams.set('pageVariant', pageVariantPreviewId);
+  const requestContext =
+    options.previewContext === undefined
+      ? previewRequest
+      : parsePreviewRequest(withPreviewContext('/', options.previewContext));
+  // A component-library preview has no page template or content view mode.
+  const context: PreviewContext = componentPreviewId
+    ? { language: requestContext.language }
+    : requestContext;
+  if (liveDraft) {
+    if (context.excludeAutoSave) {
+      url.searchParams.set('excludeAutoSave', 'true');
+    }
+    for (const key of ['language', 'viewMode', 'pageVariant'] as const) {
+      if (context[key]) {
+        url.searchParams.set(key, context[key]);
+      }
+    }
   }
   const response = await fetchImpl(url, {
     headers,
@@ -83,6 +91,17 @@ export async function fetchPage(
   }
   const raw = (await response.json()) as PageResult;
   if (isPageRedirect(raw)) {
+    // A local redirect remains inside this preview document. Keep its context
+    // without adding frontend-only parameters to external destinations.
+    if (liveDraft && !raw.redirect.external) {
+      return {
+        ...raw,
+        redirect: {
+          ...raw.redirect,
+          url: withPreviewContext(raw.redirect.url, context),
+        },
+      };
+    }
     return raw;
   }
   // Sites running a Canvas version that predates the context API answer

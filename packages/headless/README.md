@@ -92,10 +92,19 @@ instead of `Page`. It contains `redirect.url`, `redirect.external`, and Drupal's
 configured `redirect.statusCode`. Handle it before reading page fields using the
 framework's redirect primitive.
 
-Authorized draft sessions use Canvas auto-saves by default. Set
-`previewContext.excludeAutoSave` to `true` in the signed assertion to exclude
-them from `fetchPage()` and `fetchEntity()`, including after renewal. Public
-calls use stored content.
+Preview context (`language`, `viewMode`, `pageVariant`, and `excludeAutoSave`)
+travels with each request URL. `fetchPage()` reads it through the framework
+adapter and applies it only with a live draft session. Settings in the supplied
+path override the current request's settings. An explicit context argument, for
+example `server.fetchPage(path, { viewMode: 'teaser' })`, replaces all
+URL-derived settings; pass `{}` to clear them.
+
+Use `withPreviewContext(path, context)` to replace a URL's preview settings and
+`parsePreviewRequest(path)` to read them and obtain the cleaned `requestUri`.
+Both preserve unrelated query parameters and fragments.
+
+Draft previews include Canvas auto-saves by default. Set `excludeAutoSave: true`
+in the context to use stored content.
 
 `page.route.negotiatedLanguage` identifies the negotiated content language.
 `page.route.translations` lists every enabled language as

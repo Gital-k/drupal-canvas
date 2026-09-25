@@ -3,7 +3,11 @@
  * Hosts authenticated headless previews inside Drupal entity routes.
  */
 
-import { createHeadlessPreviewHost } from '@drupal-canvas/headless-host';
+import {
+  createHeadlessPreviewHost,
+  parsePreviewRequest,
+  withPreviewContext,
+} from '@drupal-canvas/headless-host';
 
 import { observeHeadlessPreviewAvailability } from './headlessPreviewAvailability';
 import {
@@ -125,7 +129,12 @@ Drupal.behaviors.canvasHeadlessPreview = {
 
       // Fragments never reach Drupal's server. Copy them into the frontend URL
       // on initial load and when host navigation or browser history changes it.
-      const previewUrl = new URL(settings.previewUrl);
+      const previewUrl = new URL(
+        withPreviewContext(settings.previewUrl, {
+          ...parsePreviewRequest(settings.previewUrl),
+          excludeAutoSave: true,
+        }),
+      );
       const getFragment = () => getUrlFragment(new URL(window.location.href));
       previewUrl.hash = getFragment();
       const syncFragment = () => {
@@ -220,7 +229,13 @@ Drupal.behaviors.canvasHeadlessPreview = {
             url.searchParams.set(key, value),
           );
           // Keep Drupal's selected content on activation, renewal, and recovery.
-          url.searchParams.set('exclude_auto_save', '1');
+          url.searchParams.set(
+            'path',
+            withPreviewContext(params.path, {
+              ...parsePreviewRequest(params.path),
+              excludeAutoSave: true,
+            }),
+          );
           const response = await fetch(url, {
             method: 'POST',
             credentials: 'same-origin',

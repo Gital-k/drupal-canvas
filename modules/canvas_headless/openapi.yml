@@ -297,7 +297,7 @@ paths:
         - name: language
           in: query
           required: false
-          description: Configured language selected in Canvas's read-only preview, retained in signed preview context. An unknown language returns 400.
+          description: Configured language selected in Canvas's read-only preview. An unknown language returns 400.
           schema:
             type: string
         - name: view_mode
@@ -310,7 +310,7 @@ paths:
         - name: exclude_auto_save
           in: query
           required: false
-          description: Exclude Canvas auto-saves from the preview session.
+          description: Exclude Canvas auto-saves from this preview request.
           schema:
             oneOf:
               - type: boolean
@@ -353,16 +353,6 @@ paths:
             type: string
             examples:
               - /node/7
-        - name: exclude_auto_save
-          in: query
-          required: false
-          description: Exclude Canvas auto-saves from the preview session.
-          schema:
-            oneOf:
-              - type: boolean
-              - type: integer
-                enum: [0, 1]
-            default: false
       responses:
         '302':
           description: Redirect to frontend draft URL with fresh assertion.

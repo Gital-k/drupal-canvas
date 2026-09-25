@@ -114,6 +114,7 @@ beforeEach(() => {
 
 afterEach(() => {
   document.body.innerHTML = '';
+  window.history.replaceState(null, '', '/');
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
@@ -245,20 +246,28 @@ describe('DraftSessionElement', () => {
     });
   });
 
-  it('tracks path changes and retains renewal query parameters', () => {
+  it('tracks path changes and retains request-local preview selection on renewal', () => {
+    const initialPath = '/initial?_canvas_excludeAutoSave=true';
+    window.history.replaceState(null, '', initialPath);
     const { element, snapshots, renewLink } = mount({
       initialExpired: true,
-      renewUrl:
-        'https://drupal.example/canvas-headless/renew?exclude_auto_save=1',
+      renewUrl: 'https://drupal.example/canvas-headless/renew',
     });
-    expect(snapshots.at(-1)).toMatchObject({ path: '/' });
+    expect(snapshots.at(-1)).toMatchObject({ path: initialPath });
+    expect(new URL(renewLink.href).searchParams.get('path')).toBe(initialPath);
 
-    element.setAttribute('path', '/node/7');
+    element.setAttribute('path', '/node/7?_canvas_excludeAutoSave=true');
 
-    expect(snapshots.at(-1)).toMatchObject({ path: '/node/7' });
+    expect(snapshots.at(-1)).toMatchObject({
+      path: '/node/7?_canvas_excludeAutoSave=true',
+    });
     expect(renewLink.getAttribute('href')).toBe(
-      'https://drupal.example/canvas-headless/renew?exclude_auto_save=1&path=%2Fnode%2F7',
+      'https://drupal.example/canvas-headless/renew?path=%2Fnode%2F7%3F_canvas_excludeAutoSave%3Dtrue',
     );
+
+    element.removeAttribute('path');
+    expect(snapshots.at(-1)).toMatchObject({ path: initialPath });
+    expect(new URL(renewLink.href).searchParams.get('path')).toBe(initialPath);
   });
 
   it('honors an initial path attribute over window.location', () => {

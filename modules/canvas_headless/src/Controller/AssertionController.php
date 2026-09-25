@@ -140,7 +140,7 @@ class AssertionController extends ControllerBase {
     }
     // Page variants are config entities without a canonical URL. Their
     // headless editor preview enters the frontend at its root path and carries
-    // the edited variant in signed preview context instead.
+    // the edited variant in the signed entry path's query string instead.
     if ($entity instanceof PageVariant) {
       return '/';
     }
@@ -181,7 +181,7 @@ class AssertionController extends ControllerBase {
    * Reads optional rendering context without changing preview authorization.
    *
    * @return array{viewMode?: string, pageVariant?: string, language?: string, excludeAutoSave?: bool}
-   *   The context carried by the signed preview assertion.
+   *   The rendering choices added to the signed entry path's query string.
    */
   protected function previewContext(Request $request): array {
     $context = [];

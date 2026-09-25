@@ -140,14 +140,38 @@ class AssertionControllerTest extends KernelTestBase {
    */
   public function testMintForPath(): void {
     $this->setCurrentUser($this->editor);
-    $response = $this->request(self::mintRequest(['path' => '/some-path']));
+    // Request-specific rendering options travel in the entry path, not the
+    // session's preview context.
+    foreach (self::providerPreviewPaths() as [$query, $expected_path]) {
+      $response = $this->request(self::mintRequest($query));
 
-    self::assertSame(200, $response->getStatusCode());
-    $claims = self::decodeAssertion($response->getContent());
-    self::assertSame('/some-path', $claims->claims()->get('path'));
-    self::assertSame((string) $this->editor->id(), $claims->claims()->get('sub'));
-    self::assertSame(PreviewAssertionFactory::TYP_HEADER, $claims->headers()->get('typ'));
-    self::assertFalse($claims->claims()->has('previewContext'));
+      self::assertSame(200, $response->getStatusCode());
+      $claims = self::decodeAssertion($response->getContent());
+      self::assertSame($expected_path, $claims->claims()->get('path'));
+      self::assertSame((string) $this->editor->id(), $claims->claims()->get('sub'));
+      self::assertSame(PreviewAssertionFactory::TYP_HEADER, $claims->headers()->get('typ'));
+      self::assertFalse($claims->claims()->has('previewContext'));
+    }
+  }
+
+  /**
+   * Paths and explicit context for minting and standalone renewal.
+   *
+   * @return array<string, array{array<string, string>, string}>
+   *   Request query parameters and the expected signed entry path.
+   */
+  public static function providerPreviewPaths(): array {
+    $path = '/some-path?_canvas_excludeAutoSave=true&_canvas_language=fr&_canvas_viewMode=teaser&_canvas_pageVariant=alternate&tag=a&tag=b#details';
+    return [
+      'plain path' => [['path' => '/some-path'], '/some-path'],
+      'context in path' => [['path' => $path], $path],
+      'exclude auto-saves' => [['path' => '/some-path', 'exclude_auto_save' => '1'], '/some-path?_canvas_excludeAutoSave=true'],
+      'include auto-saves' => [['path' => '/some-path', 'exclude_auto_save' => '0'], '/some-path?_canvas_excludeAutoSave=false'],
+      'explicit context overrides path' => [
+        ['path' => $path, 'exclude_auto_save' => 'false', 'language' => 'en', 'view_mode' => 'full'],
+        '/some-path?_canvas_pageVariant=alternate&tag=a&tag=b&_canvas_language=en&_canvas_viewMode=full&_canvas_excludeAutoSave=false#details',
+      ],
+    ];
   }
 
   /**
@@ -192,10 +216,8 @@ class AssertionControllerTest extends KernelTestBase {
 
     self::assertSame(200, $response->getStatusCode());
     $claims = self::decodeAssertion($response->getContent());
-    self::assertSame('/node/' . $node->id(), $claims->claims()->get('path'));
-    self::assertSame([
-      'viewMode' => 'teaser',
-    ], $claims->claims()->get('previewContext'));
+    self::assertSame('/node/' . $node->id() . '?_canvas_viewMode=teaser', $claims->claims()->get('path'));
+    self::assertFalse($claims->claims()->has('previewContext'));
   }
 
   /**
@@ -216,10 +238,8 @@ class AssertionControllerTest extends KernelTestBase {
 
     self::assertSame(200, $response->getStatusCode());
     $claims = self::decodeAssertion($response->getContent());
-    self::assertSame('/', $claims->claims()->get('path'));
-    self::assertSame([
-      'pageVariant' => 'alternate',
-    ], $claims->claims()->get('previewContext'));
+    self::assertSame('/?_canvas_pageVariant=alternate', $claims->claims()->get('path'));
+    self::assertFalse($claims->claims()->has('previewContext'));
   }
 
   /**
@@ -229,13 +249,10 @@ class AssertionControllerTest extends KernelTestBase {
     ConfigurableLanguage::createFromLangcode('fr')->save();
     $this->setCurrentUser($this->editor);
     foreach ([[], ['renewal' => '1']] as $lane) {
-      foreach ([FALSE, TRUE] as $exclude_auto_save) {
-        $response = $this->request(self::mintRequest($lane + ['path' => '/some-path', 'language' => 'fr', 'exclude_auto_save' => (string) (int) $exclude_auto_save]));
-        $claims = self::decodeAssertion($response->getContent())->claims();
-        self::assertSame(['excludeAutoSave' => $exclude_auto_save, 'language' => 'fr'], $claims->get('previewContext'));
-        parse_str((string) parse_url($claims->get('renewUrl'), PHP_URL_QUERY), $renew_query);
-        self::assertSame((string) (int) $exclude_auto_save, $renew_query['exclude_auto_save']);
-      }
+      $response = $this->request(self::mintRequest($lane + ['path' => '/some-path', 'language' => 'fr']));
+      $claims = self::decodeAssertion($response->getContent())->claims();
+      self::assertSame('/some-path?_canvas_language=fr', $claims->get('path'));
+      self::assertFalse($claims->has('previewContext'));
     }
   }
 
@@ -325,30 +342,23 @@ class AssertionControllerTest extends KernelTestBase {
    */
   public function testRenewRedirectsIntoTheApp(): void {
     $this->setCurrentUser($this->editor);
-    $url = Url::fromRoute('canvas_headless.renew', [], ['query' => ['path' => '/some-path']])->toString();
-    $response = $this->request(Request::create($url));
+    foreach (self::providerPreviewPaths() as [$query, $expected_path]) {
+      $url = Url::fromRoute('canvas_headless.renew', [], ['query' => $query])->toString();
+      $response = $this->request(Request::create($url));
 
-    self::assertTrue($response->isRedirection());
-    $location = (string) $response->headers->get('Location');
-    self::assertStringStartsWith('http://localhost:3000/api/draft?assertion=', $location);
+      self::assertTrue($response->isRedirection());
+      $location = (string) $response->headers->get('Location');
+      self::assertStringStartsWith('http://localhost:3000/api/draft?assertion=', $location);
 
-    // The redirect carries a real assertion whose session enters at the
-    // requested path.
-    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
-    self::assertIsString($query['assertion']);
-    $claims = self::decodeAssertion($query['assertion']);
-    self::assertSame('/some-path', $claims->claims()->get('path'));
-    self::assertFalse($claims->claims()->has('previewContext'));
-
-    // A standalone renewal link retains the signed auto-save selection.
-    $url = Url::fromRoute('canvas_headless.renew', [], ['query' => ['path' => '/some-path', 'exclude_auto_save' => '1']])->toString();
-    $response = $this->request(Request::create($url));
-    self::assertTrue($response->isRedirection());
-    parse_str((string) parse_url((string) $response->headers->get('Location'), PHP_URL_QUERY), $query);
-    self::assertIsString($query['assertion']);
-    $claims = self::decodeAssertion($query['assertion'])->claims();
-    self::assertSame(['excludeAutoSave' => TRUE], $claims->get('previewContext'));
-    self::assertStringEndsWith('?exclude_auto_save=1', $claims->get('renewUrl'));
+      // The redirect carries a real assertion whose session enters at the
+      // requested path, including request-specific rendering options.
+      parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+      self::assertIsString($query['assertion']);
+      $claims = self::decodeAssertion($query['assertion']);
+      self::assertSame($expected_path, $claims->claims()->get('path'));
+      self::assertFalse($claims->claims()->has('previewContext'));
+      self::assertStringNotContainsString('exclude_auto_save', $claims->claims()->get('renewUrl'));
+    }
   }
 
   /**

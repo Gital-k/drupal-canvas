@@ -55,6 +55,8 @@ export {
   type DraftData,
 } from './draft-data';
 export { decodeAssertionClaims } from './assertion';
+export { parsePreviewRequest, withPreviewContext } from './preview-context';
+export type { PreviewContext } from './preview-context';
 export { getSessionToken, type AccessToken } from './token';
 export {
   isPageRedirect,

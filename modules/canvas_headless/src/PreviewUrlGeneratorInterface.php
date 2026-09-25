@@ -61,8 +61,7 @@ interface PreviewUrlGeneratorInterface {
    *   TRUE for the in-place renewal lane; see
    *   \Drupal\canvas_headless\PreviewAssertionFactoryInterface::issue().
    * @param array{viewMode?: string, pageVariant?: string, language?: string, excludeAutoSave?: bool} $preview_context
-   *   Optional rendering context for an editor preview. Auto-saves are included
-   *   unless excludeAutoSave is TRUE.
+   *   Optional rendering context for an editor preview.
    *
    * @return string|null
    *   The serialized, signed JWT, or NULL when the current user may not

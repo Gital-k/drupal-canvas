@@ -48,39 +48,26 @@ describe('parseDraftData', () => {
     );
   });
 
-  it.each([undefined, false, true])(
-    'round-trips optional editor preview context with excludeAutoSave=%s',
-    (excludeAutoSave) => {
-      const draftData = {
+  it.each([
+    { language: 'fr', viewMode: 'teaser', pageVariant: 'alternate' },
+    { language: null },
+    null,
+  ])(
+    'removes obsolete rendering context from older cookies: %s',
+    (previewContext) => {
+      const data = {
         ...validDraftData,
-        previewContext: {
-          language: 'fr',
-          viewMode: 'teaser',
-          pageVariant: 'alternate',
-          ...(excludeAutoSave !== undefined && { excludeAutoSave }),
-        },
+        path: '/node/1?filter=a%20b&_canvas_language=pl&_canvas_viewMode=teaser&_canvas_pageVariant=alternate&_canvas_excludeAutoSave=true#section',
+        previewContext,
       };
-      expect(parseDraftData(serializeDraftData(draftData))).toEqual(draftData);
+      const expected = {
+        ...validDraftData,
+        path: '/node/1?filter=a%20b#section',
+      };
+      expect(parseDraftData(JSON.stringify(data))).toEqual(expected);
+      expect(JSON.parse(serializeDraftData(data))).toEqual(expected);
     },
   );
-
-  it.each([
-    { pageVariant: 42 },
-    { language: 42 },
-    { language: null },
-    { excludeAutoSave: 'false' },
-    { excludeAutoSave: 0 },
-    { excludeAutoSave: null },
-  ])('rejects invalid editor preview context %s', (previewContext) => {
-    expect(
-      parseDraftData(
-        JSON.stringify({
-          ...validDraftData,
-          previewContext,
-        }),
-      ),
-    ).toBeNull();
-  });
 
   it.each([null, undefined, ''])('returns null for %s', (value) => {
     expect(parseDraftData(value)).toBeNull();
