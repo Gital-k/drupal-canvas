@@ -298,12 +298,56 @@ final class StaticPropSource extends PropSourceBase {
 
     // Third: conjure the expected FieldItemList instance.
     $field_item_list = self::conjureFieldItemList($expression, $cardinality, $field_storage_settings, $field_instance_settings);
+    $value = $sdc_prop_source['value'] ?? [];
+    // The client sends date+time values as entered, in the user's local time.
+    // Convert them to UTC storage format, like the datetime widget does on
+    // entity forms.
+    // @see ::formTemporaryRemoveThisExclamationExclamationExclamation()
+    // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::massageFormValues()
+    // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::DATETIME_TYPE_DATETIME
+    if (\in_array($expression->getFieldType(), ['datetime', 'daterange'], TRUE) && ($field_storage_settings['datetime_type'] ?? NULL) === 'datetime') {
+      $value = self::convertLocalDateTimeToUtc($value);
+    }
     // TRICKY: Setting `[]` is the equivalent of emptying a field. 🤷 (NULL
     // causes *some* field widgets (e.g. image) to fail.)
     // @see \Drupal\Core\Entity\ContentEntityBase::__unset()
-    $field_item_list->setValue($sdc_prop_source['value'] ?? []);
+    $field_item_list->setValue($value);
 
     return new StaticPropSource($field_item_list, $expression, $cardinality, $field_storage_settings, $field_instance_settings);
+  }
+
+  /**
+   * Converts local date+time values sent by the client to UTC storage format.
+   *
+   * @param mixed $value
+   *   A datetime or daterange static prop source value: a string, a list of
+   *   strings, or an array of strings keyed by field property (`value`,
+   *   `end_value`).
+   *
+   * @return mixed
+   *   The same structure, with every `YYYY-MM-DD HH:MM[:SS]` string
+   *   interpreted in the current user's timezone and converted to
+   *   \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::DATETIME_STORAGE_FORMAT
+   *   in UTC. Any other value (e.g. already stored in UTC) is left unchanged.
+   *
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::evaluate()
+   */
+  private static function convertLocalDateTimeToUtc(mixed $value): mixed {
+    if (\is_array($value)) {
+      return \array_map(self::convertLocalDateTimeToUtc(...), $value);
+    }
+    if (!\is_string($value) || !\preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/', $value)) {
+      return $value;
+    }
+    // Without an explicit timezone, DrupalDateTime uses the current user's.
+    // @see \Drupal\Core\Datetime\DrupalDateTime::prepareTimezone()
+    $date = new DrupalDateTime($value);
+    if ($date->hasErrors()) {
+      return $value;
+    }
+    // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::STORAGE_TIMEZONE
+    // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::DATETIME_STORAGE_FORMAT
+    return $date->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s');
   }
 
   /**
@@ -604,16 +648,14 @@ final class StaticPropSource extends PropSourceBase {
         if (isset($widget_form['widget'][$i])) {
           // @see \Drupal\Core\Field\FieldItemList::__get()
           // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItem::propertyDefinitions()
+          // Stored values are always in UTC. The widget's `#date_timezone`
+          // converts them for display: to the current user's timezone for
+          // date+time values, not at all (UTC) for date-only values.
+          // @see \Drupal\datetime\Plugin\Field\FieldWidget\DateTimeWidgetBase::formElement()
+          // @see \Drupal\Core\Datetime\Element\Datetime::valueCallback()
+          // @see \Drupal\datetime\Plugin\Field\FieldType\DateTimeItemInterface::STORAGE_TIMEZONE
           // @phpstan-ignore property.notFound
-          $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value);
-
-          // No timezone adjusting takes place when entering or storing date
-          // values. It assumes the date time selected is literally the date
-          // time stored. Because of that, the form render needs to assume UTC
-          // as well, otherwise the input values will be different upon
-          // reloading the form.
-          // @see https://drupal.org/i/3501281
-          $widget_form['widget'][$i]['value']['#date_timezone'] = 'UTC';
+          $widget_form['widget'][$i]['value']['#default_value'] = new DrupalDateTime($this->fieldItemList[$i]->value, 'UTC');
         }
       }
     }

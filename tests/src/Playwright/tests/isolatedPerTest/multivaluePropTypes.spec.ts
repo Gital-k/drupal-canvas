@@ -558,7 +558,7 @@ test.describe('Multivalue Prop Types', () => {
       0,
     );
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-24T08:00:00.000Z');
+      await expect(items.nth(0)).toContainText('2025-12-23T21:00:00Z');
     });
 
     await dateTimeUnlimitedField
@@ -575,8 +575,8 @@ test.describe('Multivalue Prop Types', () => {
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
       await items.nth(0).scrollIntoViewIfNeeded();
       await expect(items).toHaveCount(2);
-      await expect(items.nth(0)).toContainText('2025-12-24T08:00:00.000Z');
-      await expect(items.nth(1)).toContainText('2025-12-25T14:30:00.000Z');
+      await expect(items.nth(0)).toContainText('2025-12-23T21:00:00Z');
+      await expect(items.nth(1)).toContainText('2025-12-25T03:30:00Z');
     });
 
     // Verify popover header label.
@@ -592,7 +592,7 @@ test.describe('Multivalue Prop Types', () => {
     await canvas.removeMultiValueProp('DateTime (Unlimited)', 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
       await expect(items).toHaveCount(1);
-      await expect(items.nth(0)).toContainText('2025-12-25T14:30:00.000Z');
+      await expect(items.nth(0)).toContainText('2025-12-25T03:30:00Z');
     });
 
     // Add a new item and reorder.
@@ -609,8 +609,8 @@ test.describe('Multivalue Prop Types', () => {
     // Drag row 1 (2025-12-26) before row 0 (2025-12-25).
     await canvas.reorderMultiValueProp('DateTime (Unlimited)', 1, 0);
     await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
-      await expect(items.nth(0)).toContainText('2025-12-26T10:00:00.000Z');
-      await expect(items.nth(1)).toContainText('2025-12-24T08:00:00.000Z');
+      await expect(items.nth(0)).toContainText('2025-12-25T23:00:00Z');
+      await expect(items.nth(1)).toContainText('2025-12-23T21:00:00Z');
     });
 
     // Verify no ghost rows appear when deleting from bottom to top.
@@ -993,9 +993,9 @@ test.describe('Multivalue Prop Types', () => {
       // Review changes: verify all values appear in preview frame.
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount);
-        await expect(items.nth(0)).toContainText('2025-12-24');
-        await expect(items.nth(1)).toContainText('2025-12-25');
-        await expect(items.nth(2)).toContainText('2025-12-26');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00Z');
+        await expect(items.nth(1)).toContainText('2025-12-24T21:30:00Z');
+        await expect(items.nth(2)).toContainText('2025-12-25T23:00:00Z');
       });
 
       // Now proceed with deletion: Remove the last row (delete from bottom to top).
@@ -1018,8 +1018,8 @@ test.describe('Multivalue Prop Types', () => {
       // Verify the deleted row is no longer in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 1);
-        await expect(items.nth(0)).toContainText('2025-12-24');
-        await expect(items.nth(1)).toContainText('2025-12-25');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00Z');
+        await expect(items.nth(1)).toContainText('2025-12-24T21:30:00Z');
       });
 
       // Remove the new last row (continuing bottom-to-top).
@@ -1044,7 +1044,7 @@ test.describe('Multivalue Prop Types', () => {
       // Verify final state in preview
       await canvas.testInPreviewFrame('#datetime-list li', async (items) => {
         await expect(items).toHaveCount(initialRowCount - 2);
-        await expect(items.nth(0)).toContainText('2025-12-24');
+        await expect(items.nth(0)).toContainText('2025-12-23T21:00:00Z');
       });
     });
   });

@@ -49,6 +49,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use PHPUnit\Framework\Attributes\TestWith;
 use Twig\Error\Error;
 use Twig\Error\RuntimeError;
 use Twig\Error\SyntaxError;
@@ -8235,6 +8236,52 @@ HTML
     );
     $this->assertArrayHasKey('count', $inputMissingProp, 'Case 2: A required prop absent from source entirely must appear in the result with value 0 so ::buildComponentInstanceForm() can render without a 500.');
     $this->assertSame(0, $inputMissingProp['count']);
+  }
+
+  /**
+   * Tests clientModelToInput() stores local date+time values in UTC.
+   *
+   * The client sends date+time values as entered. They are interpreted in the
+   * current user's timezone, not the browser's, like the datetime widget does
+   * on entity forms.
+   *
+   * @see \Drupal\canvas\PropSource\StaticPropSource::convertLocalDateTimeToUtc()
+   */
+  #[TestWith(['2025-12-31 14:30:00', '2025-12-31T03:30:00'], 'same day in UTC')]
+  #[TestWith(['2025-12-31 08:00:00', '2025-12-30T21:00:00'], 'previous day in UTC')]
+  #[TestWith(['2026-01-01 00:30:00', '2025-12-31T13:30:00'], 'previous year in UTC')]
+  #[TestWith(['2026-01-01 11:00', '2026-01-01T00:00:00'], 'UTC midnight, without seconds')]
+  #[TestWith(['2025-12-31T13:30:00', '2025-12-31T13:30:00'], 'already stored in UTC')]
+  #[TestWith(['2026-01-01T00:30:00.000Z', '2026-01-01T00:30:00.000Z'], 'explicit offset')]
+  public function testClientModelToInputConvertsLocalDateTimeToUtc(string $client_value, string $expected_stored_value): void {
+    $this->enableModules(['canvas_test_date_formatting']);
+    $this->generateComponentConfig();
+    $component = Component::load('sdc.canvas_test_date_formatting.date-formatted');
+    $this->assertInstanceOf(Component::class, $component);
+    // A site default timezone that differs from the user's proves the user's
+    // timezone is used. Around New Year's Eve, Australia/Sydney observes
+    // daylight saving time (UTC+11): local times cross the day, month and year
+    // boundaries when converted to UTC.
+    $this->config('system.date')->set('timezone.default', 'UTC')->save();
+    $this->setUpCurrentUser(['timezone' => 'Australia/Sydney']);
+
+    $input = $component->getComponentSource()->clientModelToInput(
+      'a-uuid-for-testing',
+      $component,
+      [
+        'source' => [
+          'date_time' => [
+            'sourceType' => 'static:field_item:datetime',
+            'expression' => 'ℹ︎datetime␟value',
+            'sourceTypeSettings' => ['storage' => ['datetime_type' => 'datetime']],
+            'value' => $client_value,
+          ],
+        ],
+        'resolved' => ['date_time' => $client_value],
+      ],
+      NULL,
+    );
+    $this->assertSame($expected_stored_value, $input['date_time']);
   }
 
   public function alter(ContainerBuilder $container): void {
