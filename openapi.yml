@@ -1235,6 +1235,10 @@ paths:
     post:
       deprecated: true
       summary: Reports that Page Regions were replaced by Page Variants.
+      # No `requestBody`: this operation never reads one. Clients that still
+      # synchronize Page Regions do send a body, but the response is always
+      # 410 Gone.
+      # @see \Drupal\canvas\Controller\ApiConfigControllers::pageRegionGone()
       responses:
         '410':
           $ref: '#/components/responses/PageRegionGoneResponse'
@@ -1259,6 +1263,10 @@ paths:
       summary: Reports that Page Regions were replaced by Page Variants.
       parameters:
         - $ref: '#/components/parameters/configEntityId'
+      # No `requestBody`: this operation never reads one. Clients that still
+      # synchronize Page Regions do send a body, but the response is always
+      # 410 Gone.
+      # @see \Drupal\canvas\Controller\ApiConfigControllers::pageRegionGone()
       responses:
         '410':
           $ref: '#/components/responses/PageRegionGoneResponse'
@@ -2269,6 +2277,8 @@ paths:
       - $ref: '#/components/parameters/entityId'
     patch:
       summary: Generates a component instance form for a content template.
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentInstanceFormGeneration'
       responses:
         '200':
           $ref: '#/components/responses/ComponentInstanceFormResponse'
@@ -2277,6 +2287,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryAjaxForm'
         - $ref: '#/components/parameters/queryWrapperFormat'
+      requestBody:
+        $ref: '#/components/requestBodies/DrupalAjaxFormSubmission'
       responses:
         '200':
           $ref: '#/components/responses/DrupalAjaxResponse'
@@ -2286,6 +2298,8 @@ paths:
       - $ref: '#/components/parameters/configEntityId'
     patch:
       summary: Generates a component instance form for a pattern.
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentInstanceFormGeneration'
       responses:
         '200':
           $ref: '#/components/responses/ComponentInstanceFormResponse'
@@ -2294,6 +2308,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryAjaxForm'
         - $ref: '#/components/parameters/queryWrapperFormat'
+      requestBody:
+        $ref: '#/components/requestBodies/DrupalAjaxFormSubmission'
       responses:
         '200':
           $ref: '#/components/responses/DrupalAjaxResponse'
@@ -2304,6 +2320,8 @@ paths:
       - $ref: '#/components/parameters/layoutEntityId'
     patch:
       summary: Generates a component instance form.
+      requestBody:
+        $ref: '#/components/requestBodies/ComponentInstanceFormGeneration'
       responses:
         '200':
           $ref: '#/components/responses/ComponentInstanceFormResponse'
@@ -2312,6 +2330,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryAjaxForm'
         - $ref: '#/components/parameters/queryWrapperFormat'
+      requestBody:
+        $ref: '#/components/requestBodies/DrupalAjaxFormSubmission'
       responses:
         '200':
           $ref: '#/components/responses/DrupalAjaxResponse'
@@ -2330,6 +2350,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryAjaxForm'
         - $ref: '#/components/parameters/queryWrapperFormat'
+      requestBody:
+        $ref: '#/components/requestBodies/DrupalAjaxFormSubmission'
       responses:
         '200':
           description: AJAX updates
@@ -2360,6 +2382,8 @@ paths:
       parameters:
         - $ref: '#/components/parameters/queryAjaxForm'
         - $ref: '#/components/parameters/queryWrapperFormat'
+      requestBody:
+        $ref: '#/components/requestBodies/DrupalAjaxFormSubmission'
       responses:
         '200':
           description: AJAX updates
@@ -3268,6 +3292,8 @@ paths:
     description: Signal that a CLI push completed successfully.
     post:
       summary: Signal that a CLI push completed successfully.
+      # No `requestBody`: this signal carries no data.
+      # @see \Drupal\canvas\Controller\ApiPushController::complete()
       responses:
         '204':
           description: Push completion recorded.
@@ -3296,6 +3322,8 @@ paths:
     description: Signal that a CLI push has started.
     post:
       summary: Signal that a CLI push has started.
+      # No `requestBody`: this signal carries no data.
+      # @see \Drupal\canvas\Controller\ApiPushController::start()
       responses:
         '204':
           description: Push start recorded.
@@ -6041,6 +6069,67 @@ components:
           label:
             type: [ 'null', string ]
             description: Optional label for the component instance.
+    # Drupal's Form API and AJAX system add the properties below to every AJAX
+    # form submission. The form's own fields are submitted alongside them; their
+    # names and structure are determined at run time by the form being
+    # submitted, hence `additionalProperties: true`.
+    # @see \Drupal\Core\Form\FormBuilder::prepareForm()
+    # @see Drupal.Ajax.prototype.beforeSerialize()
+    # @see Drupal.Ajax.prototype.beforeSend()
+    DrupalAjaxFormValues:
+      title: Drupal AJAX form values
+      type: object
+      required:
+        - form_id
+        - form_build_id
+      additionalProperties: true
+      properties:
+        form_id:
+          type: string
+          description: The ID of the form being submitted.
+        form_build_id:
+          type: string
+          description: >-
+            Identifies the cached build of the form being submitted. Drupal
+            sends a new value in the `update_build_id` AJAX command of every
+            response.
+        form_token:
+          type: string
+          description: >-
+            CSRF token. Absent for forms that opt out of tokens, and for
+            requests by unauthenticated clients.
+        _drupal_ajax:
+          type: integer
+          enum:
+            - 1
+          description: Marks the request as originating from Drupal's AJAX system.
+        ajax_iframe_upload:
+          type: integer
+          enum:
+            - 1
+          description: >-
+            Present only when the form is submitted through a hidden IFRAME
+            instead of `XMLHttpRequest`. Browsers without the file API do this
+            for forms that contain a file input.
+        ajax_page_state:
+          type: object
+          description: >-
+            The theme and asset libraries already present on the page, so that
+            the response only contains the CSS and JavaScript that still needs
+            to be loaded.
+          additionalProperties: false
+          properties:
+            theme:
+              type: string
+              description: The name of the theme the page was rendered with.
+            theme_token:
+              type: string
+              description: Token proving that `theme` was not tampered with.
+            libraries:
+              type: string
+              description: >-
+                Comma-separated (and potentially compressed) list of the asset
+                libraries already loaded on the page.
   # @see https://spec.openapis.org/oas/v3.1.0.html#response-object
   responses:
     ContentEntityResponse:
@@ -6344,3 +6433,74 @@ components:
             application/json:
               schema:
                 $ref: '#/components/schemas/NewContentRequestBody'
+    # Sent as form-encoded data rather than JSON, because Drupal's Form API
+    # reads these values from the request's parameter bag.
+    # @see \Drupal\canvas\Form\ComponentInstanceForm::buildForm()
+    # @see ui/src/services/componentInstanceForm.ts
+    ComponentInstanceFormGeneration:
+      description: The component instance to generate a form for.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          examples:
+            imageComponentInstance:
+              summary: Generate the form for an image component instance
+              value:
+                form_canvas_tree: '{"nodeType":"component","slots":[],"type":"sdc.canvas_test_sdc.image@1af4f0e04b845e4b","uuid":"5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4"}'
+                form_canvas_props: '{"resolved":{"image":null},"source":{}}'
+                form_canvas_selected: 5f18db31-fa2f-4f4e-a377-dc0c6a0b7dc4
+          schema:
+            title: Component instance form generation
+            type: object
+            required:
+              - form_canvas_tree
+              - form_canvas_props
+            additionalProperties: false
+            properties:
+              form_canvas_tree:
+                type: string
+                description: >-
+                  JSON-encoded component tree node for the component instance
+                  to generate a form for. Its `type` must be
+                  `<Component config entity ID>@<version>`: the version
+                  determines which component version's settings, such as field
+                  type and widget, the form is built with.
+              form_canvas_props:
+                type: string
+                description: >-
+                  JSON-encoded client-side model (server-side terminology:
+                  inputs) of the component instance to generate a form for.
+              form_canvas_selected:
+                type: string
+                format: uuid
+                description: >-
+                  UUID of the component instance to generate a form for. A
+                  query parameter of the same name takes precedence over this.
+              latestUndoRedoActionId:
+                type: string
+                description: >-
+                  Identifies the most recent undo/redo action. Not used by the
+                  server: the Canvas UI reads it back from the request it sent,
+                  to decide when to re-render the returned form.
+              ajaxPageState:
+                type: string
+                description: >-
+                  JSON-encoded equivalent of the `ajax_page_state` parameter
+                  that Drupal's AJAX system sends automatically. Sent
+                  explicitly because this request is not made by `Drupal.Ajax`.
+    # Drupal's AJAX system submits forms as form-encoded data, or as multipart
+    # data when the form contains a file input.
+    # @see Drupal.Ajax.prototype.beforeSend()
+    # @see core/misc/jquery.form.js
+    DrupalAjaxFormSubmission:
+      description: >-
+        A form submission performed by Drupal's AJAX system: the values of the
+        form's own fields, plus Drupal Form API and AJAX bookkeeping.
+      required: true
+      content:
+        application/x-www-form-urlencoded:
+          schema:
+            $ref: '#/components/schemas/DrupalAjaxFormValues'
+        multipart/form-data:
+          schema:
+            $ref: '#/components/schemas/DrupalAjaxFormValues'

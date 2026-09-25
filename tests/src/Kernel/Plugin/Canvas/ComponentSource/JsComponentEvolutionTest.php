@@ -242,7 +242,7 @@ final class JsComponentEvolutionTest extends CanvasKernelTestBase {
 
     // Test can still edit the old component in a form, if no auto-update happened.
     // But if an auto-update happened, they will edit the active version.
-    $this->request(Request::create(\sprintf('/canvas/api/v0/form/component-instance/%s/1', Page::ENTITY_TYPE_ID), 'PATCH', [
+    $this->request(self::createFormEncodedRequest(\sprintf('/canvas/api/v0/form/component-instance/%s/1', Page::ENTITY_TYPE_ID), 'PATCH', [
       'form_canvas_tree' => \json_encode([
         'nodeType' => 'component',
         'slots' => [],
