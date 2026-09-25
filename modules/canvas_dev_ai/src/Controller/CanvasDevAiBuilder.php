@@ -499,27 +499,21 @@ final class CanvasDevAiBuilder extends ControllerBase {
   /**
    * Cuts each kept placement result down to its success sentence.
    *
-   * The place_components and edit_components tools return a large success
-   * message: the assigned UUIDs, the predicted layout, the dump of the
-   * applied updates and guidance for the hops that remain in the turn. All
-   * of it is scoped to the turn the tool ran in — a later turn reads the
-   * page from the layout token in its system prompt — so the history that
-   * turn resumes only needs the first line, which says the operation
-   * succeeded, sparing the tokens the full text would cost on every later
-   * turn. A failure result does not start with that line and is kept whole.
+   * The place_components and edit_components tools succeed with a verbose
+   * message whose details — assigned UUIDs, predicted layout, applied
+   * updates — only serve the turn the tool ran in, so the state a later
+   * turn resumes keeps the success sentence alone. Failure results are
+   * kept whole.
    *
    * @param array $state
    *   The agent state, as written by its ::toArray().
    *
    * @return array
    *   The state, with each trimmed tool message carrying the sentence only.
-   *
-   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents::SUCCESS_MESSAGE
-   * @see \Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponents::SUCCESS_MESSAGE
    */
   private static function trimKeptToolResults(array $state): array {
     foreach ($state['chat_history'] ?? [] as $index => $message) {
-      if (($message['role'] ?? NULL) !== 'tool' || !\is_string($message['text'] ?? NULL)) {
+      if ($message['role'] !== 'tool') {
         continue;
       }
       foreach ([PlaceComponents::SUCCESS_MESSAGE, EditComponents::SUCCESS_MESSAGE] as $success_message) {

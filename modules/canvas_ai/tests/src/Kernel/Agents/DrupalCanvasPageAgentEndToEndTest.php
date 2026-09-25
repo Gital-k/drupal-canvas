@@ -9,7 +9,9 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas_ai\CanvasAiPermissions;
+use Drupal\canvas_ai\CanvasAiTempStore;
 use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponents;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
 use Drupal\Component\Uuid\Php;
 use Drupal\Component\Uuid\UuidInterface;
@@ -261,8 +263,14 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
    * - Hop 3 sends the layout containing the hero — without it the `below`
    *   placement could not resolve — and returns the heading placement plus the
    *   closing answer.
+   *
+   * With the site opted in, the clean turn end keeps the conversation state,
+   * with each placement result cut down to its success sentence.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::trimKeptToolResults()
    */
   public function testSequentialPlacementAcrossHops(): void {
+    $this->config('canvas_dev_ai.settings')->set('keep_tool_calls_in_history', TRUE)->save();
     $messages = [['role' => 'user', 'text' => 'Add a hero with a heading under it']];
     $empty_layout = [
       'regions' => [
@@ -364,6 +372,21 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
         ],
       ],
     ], ['operations' => $hop3['operations']]);
+
+    // The turn ended clean with the setting on, so its state was kept for
+    // the conversation — with each place_components result cut down to its
+    // success sentence, shedding the UUIDs, predicted layout and guidance
+    // that only served this turn. Both placements ran their tool during
+    // this turn, so both results are trimmed.
+    $conversation = $this->container->get(CanvasAiTempStore::class)->getStoredConversationState('test-conversation');
+    self::assertNotNull($conversation);
+    $tool_messages = \array_values(\array_filter(
+      $conversation['state']['chat_history'],
+      static fn (array $message): bool => $message['role'] === 'tool',
+    ));
+    self::assertCount(2, $tool_messages);
+    self::assertSame(PlaceComponents::SUCCESS_MESSAGE, $tool_messages[0]['text']);
+    self::assertSame(PlaceComponents::SUCCESS_MESSAGE, $tool_messages[1]['text']);
   }
 
   /**
