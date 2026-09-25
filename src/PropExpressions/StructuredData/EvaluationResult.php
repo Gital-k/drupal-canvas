@@ -43,16 +43,16 @@ final class EvaluationResult implements CacheableDependencyInterface, Attachment
    */
   public readonly array $attachments;
 
-   /**
-    * @param mixed $value
-    *   The evaluation result. Can be an ActualEvaluationResult, an
-    *   EvaluationResult instance,an array of EvaluationResult instances,
-    *   or any raw value that will be hoisted.
-    * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
-    *   (optional) The cacheability metadata for the evaluation result.
-    * @param array<string, mixed> $attachments
-    *   (optional) The `#attached` assets the evaluation result needs to bubble.
-    */
+  /**
+   * @param mixed $value
+   *   The evaluation result. Can be an ActualEvaluationResult, an
+   *   EvaluationResult instance,an array of EvaluationResult instances,
+   *   or any raw value that will be hoisted.
+   * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
+   *   (optional) The cacheability metadata for the evaluation result.
+   * @param array<string, mixed> $attachments
+   *   (optional) The `#attached` assets the evaluation result needs to bubble.
+   */
   public function __construct(
     mixed $value,
     CacheableDependencyInterface $cacheability = new CacheableMetadata(),
