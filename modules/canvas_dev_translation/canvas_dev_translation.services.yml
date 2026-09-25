@@ -1,0 +1,10 @@
+services:
+  logger.channel.canvas_dev_translation:
+    parent: logger.channel_base
+    arguments: ['canvas_dev_translation']
+
+  canvas_dev_translation.config_translation_job_subscriber:
+    class: Drupal\canvas_dev_translation\EventSubscriber\ConfigTranslationJobSubscriber
+    autowire: true
+    tags:
+      - { name: event_subscriber }

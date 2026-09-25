@@ -9,3 +9,5 @@ type: module
 package: Drupal Canvas
 dependencies:
   - canvas:canvas
+  - tmgmt:tmgmt
+  - tmgmt:tmgmt_content
