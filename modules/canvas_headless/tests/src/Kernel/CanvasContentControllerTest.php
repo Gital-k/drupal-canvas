@@ -1267,9 +1267,17 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests private unsaved form previews through the content API.
+   * Tests private unsaved form previews on mono- and multilingual sites.
    */
-  public function testEntityPreviews(): void {
+  #[DataProvider('entityPreviewLanguages')]
+  public function testEntityPreviews(bool $multilingual): void {
+    if ($multilingual) {
+      ConfigurableLanguage::createFromLangcode('fr')->save();
+      $this->config('language.negotiation')
+        ->set('url.prefixes', ['en' => '', 'fr' => 'fr'])
+        ->save();
+      $this->container->get('kernel')->rebuildContainer();
+    }
     /** @var \Drupal\user\UserInterface $editor */
     $editor = $this->createUser(['access content', 'create article content', 'edit any article content', 'view all revisions']);
     $this->setCurrentAccount($editor);
@@ -1317,16 +1325,28 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
       self::assertTrue($data['route']['managedByCanvas']);
       self::assertStringContainsString('Unsaved form title', \json_encode($data['content'], JSON_THROW_ON_ERROR));
       self::assertSame('Unsaved form title', $data['head']['title']);
+      self::assertSame($multilingual ? ['en', 'fr'] : [], array_column($data['route']['translations'], 'langcode'));
+      self::assertSame($multilingual ? ['/node/' . $node->id(), '/fr/node/' . $node->id()] : [], array_column($data['route']['translations'], 'url'));
       self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
       self::assertSame($account, $this->container->get(AccountProxyInterface::class)->getAccount());
     }
     $this->setCurrentAccount($editor);
     $new_node = Node::create(['type' => 'article', 'title' => 'New unsaved node', 'uid' => $editor->id()]);
+    self::assertNull($new_node->id());
     $form = $this->container->get(EntityTypeManagerInterface::class)->getFormObject('node', 'default')->setEntity($new_node);
     $this->container->get(PrivateTempStoreFactory::class)->get('node_preview')->set((string) $new_node->uuid(), (new FormState())->setFormObject($form));
     $this->setCurrentAccount($account);
-    $data = self::responseData($this->renderContentPath('/node/preview/' . $new_node->uuid() . '/full'));
-    self::assertStringContainsString('New unsaved node', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+    foreach ($multilingual ? ['en' => '', 'fr' => '/fr'] : ['en' => ''] as $langcode => $prefix) {
+      $response = $this->renderContentPath($prefix . '/node/preview/' . $new_node->uuid() . '/full');
+      self::assertSame(200, $response->getStatusCode());
+      $data = self::responseData($response);
+      self::assertTrue($data['route']['managedByCanvas']);
+      self::assertStringContainsString('New unsaved node', \json_encode($data['content'], JSON_THROW_ON_ERROR));
+      self::assertSame('New unsaved node', $data['head']['title']);
+      self::assertSame($langcode, $data['route']['negotiatedLanguage']);
+      self::assertSame([], $data['route']['translations']);
+      self::assertSame(0, $response->getCacheableMetadata()->getCacheMaxAge());
+    }
 
     // A page variant can wrap Drupal-rendered content without a Canvas content
     // template. Its nested entity must not reuse a previous form preview.
@@ -1397,6 +1417,14 @@ final class CanvasContentControllerTest extends CanvasKernelTestBase {
     $this->setCurrentAccount($this->createTokenAccount(TRUE));
     $this->expectException(ParamNotConvertedException::class);
     $this->renderContentPath('/node/preview/' . $new_node->uuid() . '/full');
+  }
+
+  /**
+   * Provides monolingual and multilingual site configurations for previews.
+   */
+  public static function entityPreviewLanguages(): iterable {
+    yield 'monolingual' => [FALSE];
+    yield 'multilingual' => [TRUE];
   }
 
   /**
