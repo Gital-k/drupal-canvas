@@ -160,13 +160,24 @@ render on the server for the initial HTML and hydrate in the browser, where
 hooks and interactivity run. `context={page.context}` lets components read the
 page and site data through `usePageContext()` and `useSiteContext()`; an
 explicit `jsonApi` prop replaces the configuration `CanvasRuntime` supplies.
-Server rendering a component does not run its SWR fetcher: prefetch data with
-`getClient()` in the page and supply it through a client `SWRConfig` wrapper
-(`fallback`) so the initial HTML contains it — see `@drupal-canvas/headless`.
-During server rendering the hook's client is the same draft-aware client as in
-the browser, so fallback data renders and hydration matches, but it performs no
-network requests in a draft session (`ServerRenderingDraftFetchError` names the
-fix); public pages get a direct client.
+
+### Server rendering and SWR
+
+> **Required for SWR data in the initial HTML:** Server rendering a component
+> does not run its SWR fetcher. In the server page, obtain a client with
+> `await getClient()` and use it to prefetch the data. Pass that data as `fallback`
+> to a client `SWRConfig` wrapper around `CanvasComponentTree`, using the same
+> keys as the components' SWR hooks.
+
+See the [prefetch example in `@drupal-canvas/headless`](../headless/README.md#server-rendering-and-swr).
+SWR fetches in the browser after hydration.
+
+During server rendering the hook's client remains draft-aware so fallback data
+renders and hydration matches, but **it performs no network requests in a draft
+session**. Requests made through that client during server rendering fail with
+`ServerRenderingDraftFetchError`; prefetch draft data with the SDK's
+`getClient()` as described above. Public pages get a direct, unauthenticated
+client.
 
 ## Data access
 
