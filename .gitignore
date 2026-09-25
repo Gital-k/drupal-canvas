@@ -68,3 +68,22 @@ lerna-debug.log*
 
 # GitLab CI
 .cache
+
+.opencode/
+agent.md
+config/agent.md
+modules/agent.md
+opencode.json
+skills.md
+src/ComponentSource/agent.md
+src/Controller/agent.md
+src/Entity/agent.md
+src/EventSubscriber/agent.md
+src/Hook/agent.md
+src/Plugin/Adapter/agent.md
+src/Plugin/agent.md
+src/Validation/agent.md
+src/agent.md
+temp.patch
+tests/agent.md
+ui/agent.md

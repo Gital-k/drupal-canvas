@@ -1,0 +1,17 @@
+$schema: https://git.drupalcode.org/project/drupal/-/raw/HEAD/core/assets/schemas/v1/metadata.schema.json
+name: Canvas test SDC for required multivalue relative links
+props:
+  type: object
+  required:
+    - links
+  properties:
+    links:
+      type: array
+      title: Links
+      minItems: 1
+      items:
+        type: string
+        format: uri-reference
+      examples:
+        - - /about
+          - /contact
