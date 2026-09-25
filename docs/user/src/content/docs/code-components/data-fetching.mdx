@@ -222,13 +222,11 @@ and site data](../../../assets/images/data-fetch-2.webp)
 
 [drupal-canvas](https://www.npmjs.com/package/drupal-canvas) provides a
 [JSON:API client](https://www.npmjs.com/package/@drupal-api-client/json-api-client)
-through the `useJsonApiClient` hook, automatically configured for the current
-environment and using
+through the `useJsonApiClient` hook. Rendering integrations supply the configured
+client through a provider; the hook does not detect the environment or create a
+client. The shared implementation uses
 [DefaultSerializer](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/deserializing-data/#defaultserializer-top-level-meta-and-links) for
 [deserialization](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/deserializing-data/).
-In Drupal previews the client reads working copies through the editor's
-session; in headless frontends it reaches Drupal through the application's
-same-origin proxy.
 [Drupal core's JSON:API module](https://www.drupal.org/docs/core-modules-and-themes/core-modules/jsonapi-module)
 must be enabled to use this client.
 
@@ -236,29 +234,29 @@ The associated
 [parameter helper package](https://project.pages.drupalcode.org/api_client/jsonapi-tutorial/parameters/#generating-query-strings-with-drupal-jsonapi-params)
 is also included as a native package.
 
+#### Writing portable components
+
+Use `useJsonApiClient()` to write the same component for Drupal, Workbench, and
+React-based headless frontends. Each integration supplies the appropriate client
+through a provider. Keep Drupal globals, backend URLs, authentication, proxy
+configuration, and environment-specific branches out of the component. Outside a
+Canvas tree, your integration must supply a `JsonApiClientProvider`.
+
+Use a stable SWR key for the query and render data whenever it is available,
+including prefetched fallback data:
+
 ```jsx
 import { useJsonApiClient } from 'drupal-canvas/react';
-import { DrupalJsonApiParams } from 'drupal-jsonapi-params';
 import useSWR from 'swr';
 
 export default function List() {
   const client = useJsonApiClient();
-  const { data, error, isLoading } = useSWR(
-    client
-      ? [
-          'node--article',
-          {
-            queryString: new DrupalJsonApiParams()
-              .addInclude(['field_tags'])
-              .getQueryString(),
-          },
-        ]
-      : null,
-    ([type, options]) => client.getCollection(type, options),
+  const { data, error } = useSWR(client ? 'articles' : null, () =>
+    client.getCollection('node--article'),
   );
 
   if (error) return 'An error has occurred.';
-  if (isLoading || !data) return 'Loading...';
+  if (!data) return 'Loading...';
   return (
     <ul>
       {data.map((article) => (
@@ -270,7 +268,17 @@ export default function List() {
 ```
 
 The hook returns `null` when no client is provided, so pass `null` as the SWR
-key in that case, as above.
+key in that case, as above. Do not hide available data just because SWR reports
+`isLoading` during revalidation.
+
+<Aside title="Server rendering">
+  SWR fetchers do not run during server rendering. Use the Headless SDK's `await
+  getClient()` in server code to prefetch, then supply the results through a
+  client `SWRConfig` wrapper's `fallback` with the same key (`articles` here).
+  The renderer's draft client cannot fetch during server rendering. See the [SSR
+  and prefetch
+  guidance](https://git.drupalcode.org/project/canvas/-/blob/1.x/packages/headless/README.md#server-rendering-and-swr).
+</Aside>
 
 <Aside>
   `new JsonApiClient()` is deprecated. It keeps working in Drupal-rendered

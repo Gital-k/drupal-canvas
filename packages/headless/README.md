@@ -125,6 +125,11 @@ responses make `fetchPage()` return `null`.
 
 ## JSON:API for portable Code Components
 
+To write a component that also works in Drupal and Workbench, use the supplied
+client rather than configuring one inside the component. See
+[Writing portable components](../../docs/user/src/content/docs/code-components/data-fetching.mdx#writing-portable-components)
+for a minimal `useJsonApiClient()` and SWR example.
+
 Code Components that use `useJsonApiClient()` from `drupal-canvas/react` fetch
 Drupal content from the browser. The SDK keeps those requests on the
 application's own origin through a JSON:API proxy that the framework adapters

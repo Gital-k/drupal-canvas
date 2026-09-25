@@ -1,7 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
-// Start normally generates these modules with its Vite plugin. The route
-// regression supplies them in-memory without building or serving an app.
+// Start normally generates these modules with its Vite plugin. The JSON:API
+// proxy PUT-rejection test supplies them in-memory without building or serving
+// an app.
 const entries: Record<string, string> = {
   '#tanstack-router-entry': 'export const getRouter = () => {};',
   '#tanstack-start-entry': 'export const startInstance = undefined;',
