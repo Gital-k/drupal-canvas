@@ -138,9 +138,8 @@ abstract class JsonSchemaPropsComponentSourceBaseTestBase extends ComponentSourc
       ->loadVersion($component_with_optional_image_object_shape->getActiveVersion())
       ->getComponentSource()
       ->getDefaultExplicitInput(only_required: TRUE);
-    $hydrated = $source->hydrateComponent(['resolved' => $resolved], [], $active_required_explicit_inputs);
-    // @phpstan-ignore-next-line offsetAccess.notFound
-    self::assertSame($is_object_prop_present_in_hydration, \array_key_exists('image', $hydrated[JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME]));
+     $hydrated = $source->hydrateComponent(['resolved' => $resolved], [], $active_required_explicit_inputs);
+     self::assertSame($is_object_prop_present_in_hydration, \array_key_exists('image', $hydrated[JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME]));
     $build = $source->renderComponent($hydrated, [], $this->randomString(), FALSE);
     $html = (string) $this->renderer->renderInIsolation($build);
     if (str_starts_with($expected_html, '<')) {

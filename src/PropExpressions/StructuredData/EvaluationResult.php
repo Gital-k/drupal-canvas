@@ -43,25 +43,24 @@ final class EvaluationResult implements CacheableDependencyInterface, Attachment
    */
   public readonly array $attachments;
 
-  /**
-   * @param mixed $value
-   *   The evaluation result. Can be an ActualEvaluationResult, an
-   * EvaluationResult instance,an array of EvaluationResult instances,
-   * or any raw value that will be hoisted.
-   * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
-   *   (optional) The cacheability metadata for the evaluation result.
-   * @param array<string, mixed> $attachments
-   *   (optional) The `#attached` assets the evaluation result needs to bubble.
-   */
+   /**
+    * @param mixed $value
+    *   The evaluation result. Can be an ActualEvaluationResult, an
+    *   EvaluationResult instance,an array of EvaluationResult instances,
+    *   or any raw value that will be hoisted.
+    * @param \Drupal\Core\Cache\CacheableDependencyInterface $cacheability
+    *   (optional) The cacheability metadata for the evaluation result.
+    * @param array<string, mixed> $attachments
+    *   (optional) The `#attached` assets the evaluation result needs to bubble.
+    */
   public function __construct(
     mixed $value,
     CacheableDependencyInterface $cacheability = new CacheableMetadata(),
     array $attachments = [],
   ) {
-    if (!$value instanceof self && !self::hasNestedInstances($value)) {
-      \assert((\is_array($value) && !static::hasNestedInstances($value)) || $value instanceof EntityInterface || \is_string($value) || $value instanceof \Stringable || \is_int($value) || \is_float($value) || \is_bool($value) || \is_null($value));
-      // @phpstan-ignore-next-line assign.propertyType
-      $this->value = $value;
+     if (!$value instanceof self && !self::hasNestedInstances($value)) {
+       \assert((\is_array($value) && !static::hasNestedInstances($value)) || $value instanceof EntityInterface || \is_string($value) || $value instanceof \Stringable || \is_int($value) || \is_float($value) || \is_bool($value) || \is_null($value));
+       $this->value = $value;
       $this->setCacheability($cacheability);
       $this->attachments = $attachments;
       return;
