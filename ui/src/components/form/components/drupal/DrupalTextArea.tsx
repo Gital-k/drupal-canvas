@@ -23,10 +23,13 @@ const drupalSettings = getDrupalSettings();
 const DrupalTextArea = ({
   attributes = {},
   wrapperAttributes = {},
+  value,
 }: {
   attributes?: Attributes;
   wrapperAttributes?: Attributes;
+  value?: string;
 }) => {
+  const resolvedValue = (attributes.value ?? value)?.toString() ?? '';
   const defaultFormatName =
     (attributes?.['data-canvas-text-format'] as string) || '';
   const [format, setFormat] = useState<FormatType>(
@@ -61,7 +64,7 @@ const DrupalTextArea = ({
       {format?.editor !== 'ckeditor5' && (
         <div {...a2p(wrapperAttributes)}>
           <TextArea
-            value={attributes.value?.toString() ?? ''}
+            value={resolvedValue}
             attributes={a2p(attributes, {}, { skipAttributes: ['value'] })}
             ref={ref}
           />
