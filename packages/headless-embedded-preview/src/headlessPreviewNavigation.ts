@@ -107,6 +107,7 @@ export function createDrupalPathResolver({
 /**
  * Navigates outside the iframe, using Drupal URLs when its route check succeeds.
  * Other destinations and failed lookups keep the original clicked URL.
+ * Only current-tab requests supersede each other; new-tab requests are independent.
  */
 export function createDrupalHostNavigator({
   assignLocation = (url) => window.location.assign(url),
@@ -125,8 +126,8 @@ export function createDrupalHostNavigator({
       if (destroyed) {
         return;
       }
-      const currentGeneration = ++generation;
-      if (navigationTimer !== null) {
+      const currentGeneration = openInNewTab ? generation : ++generation;
+      if (!openInNewTab && navigationTimer !== null) {
         clearNavigationTimer(navigationTimer);
         navigationTimer = null;
       }
@@ -156,7 +157,7 @@ export function createDrupalHostNavigator({
           // A route-check failure still opens the original URL outside the iframe.
         }
       }
-      if (currentGeneration !== generation) {
+      if (destroyed || (!openInNewTab && currentGeneration !== generation)) {
         return;
       }
 

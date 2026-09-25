@@ -649,88 +649,139 @@ describe('headless preview host navigation', () => {
     navigator.destroy();
   });
 
-  it('discards an old lookup even when the latest click has no Drupal route', async () => {
-    let finishFirstLookup: ((value: string | null) => void) | undefined;
-    const firstLookup = new Promise<string | null>((resolve) => {
-      finishFirstLookup = resolve;
-    });
-    const assignLocation = vi.fn();
-    let navigate: (() => void) | undefined;
-    const setNavigationTimer = vi.fn((callback: () => void) => {
-      navigate = callback;
-      return 7;
-    });
-    const navigator = createDrupalHostNavigator({
-      assignLocation,
-      frontendOrigin: 'https://frontend.example',
-      setNavigationTimer,
-      resolveDrupalPath: vi
-        .fn()
-        .mockReturnValueOnce(firstLookup)
-        .mockResolvedValueOnce(null),
-    });
-
-    const firstNavigation = navigator.navigate(
-      'https://frontend.example/first',
-    );
-    await navigator.navigate('https://frontend.example/second');
-    finishFirstLookup?.('https://drupal.example/first');
-    await firstNavigation;
-
-    expect(assignLocation).not.toHaveBeenCalled();
-    expect(setNavigationTimer).toHaveBeenCalledOnce();
-    navigate?.();
-    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
-      'https://frontend.example/second',
-    );
-    navigator.destroy();
-  });
-
-  it('clears scheduled Drupal navigation when destroyed', async () => {
-    const clearNavigationTimer = vi.fn();
-    const assignLocation = vi.fn();
-    let navigate: (() => void) | undefined;
-    const navigator = createDrupalHostNavigator({
-      assignLocation,
-      clearNavigationTimer,
-      frontendOrigin: 'https://frontend.example',
-      resolveDrupalPath: vi
-        .fn()
-        .mockResolvedValue('https://drupal.example/node/123'),
-      setNavigationTimer: (callback) => {
+  it.each([
+    [false, false],
+    [false, true],
+    [true, false],
+    [true, true],
+  ])(
+    'supersedes only same-tab lookups, new tabs: first %s, second %s',
+    async (firstInNewTab, secondInNewTab) => {
+      let finishFirstLookup: ((value: string | null) => void) | undefined;
+      const firstLookup = new Promise<string | null>((resolve) => {
+        finishFirstLookup = resolve;
+      });
+      const assignLocation = vi.fn();
+      const openWindow = vi.fn();
+      let navigate: (() => void) | undefined;
+      const setNavigationTimer = vi.fn((callback: () => void) => {
         navigate = callback;
-        return 11;
-      },
-    });
+        return 7;
+      });
+      const navigator = createDrupalHostNavigator({
+        assignLocation,
+        openWindow,
+        frontendOrigin: 'https://frontend.example',
+        setNavigationTimer,
+        resolveDrupalPath: vi
+          .fn()
+          .mockReturnValueOnce(firstLookup)
+          .mockResolvedValueOnce(null),
+      });
 
-    await navigator.navigate('https://frontend.example/node/123');
-    navigator.destroy();
-    navigate?.();
+      const firstNavigation = navigator.navigate(
+        'https://frontend.example/first',
+        firstInNewTab,
+      );
+      await navigator.navigate(
+        'https://frontend.example/second',
+        secondInNewTab,
+      );
+      finishFirstLookup?.('https://drupal.example/first');
+      await firstNavigation;
 
-    expect(clearNavigationTimer).toHaveBeenCalledWith(11);
-    expect(assignLocation).not.toHaveBeenCalled();
-  });
+      expect(assignLocation).not.toHaveBeenCalled();
+      expect(openWindow.mock.calls).toEqual([
+        ...(secondInNewTab
+          ? [['https://frontend.example/second', '_blank', 'noopener']]
+          : []),
+        ...(firstInNewTab
+          ? [['https://drupal.example/first', '_blank', 'noopener']]
+          : []),
+      ]);
+      if (firstInNewTab && secondInNewTab) {
+        expect(setNavigationTimer).not.toHaveBeenCalled();
+      } else {
+        expect(setNavigationTimer).toHaveBeenCalledOnce();
+        navigate?.();
+        expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
+          secondInNewTab
+            ? 'https://drupal.example/first'
+            : 'https://frontend.example/second',
+        );
+      }
+      navigator.destroy();
+    },
+  );
 
-  it('ignores pending and subsequent requests after destruction', async () => {
-    let finishLookup: ((value: string | null) => void) | undefined;
-    const lookup = new Promise<string | null>((resolve) => {
-      finishLookup = resolve;
-    });
-    const resolveDrupalPath = vi.fn().mockReturnValue(lookup);
-    const setNavigationTimer = vi.fn();
-    const navigator = createDrupalHostNavigator({
-      frontendOrigin: 'https://frontend.example',
-      resolveDrupalPath,
-      setNavigationTimer,
-    });
+  it.each([false, true])(
+    'clears scheduled Drupal navigation when destroyed, intervening new tab: %s',
+    async (openInNewTab) => {
+      const clearNavigationTimer = vi.fn();
+      const assignLocation = vi.fn();
+      const openWindow = vi.fn();
+      let navigate: (() => void) | undefined;
+      const navigator = createDrupalHostNavigator({
+        assignLocation,
+        clearNavigationTimer,
+        openWindow,
+        frontendOrigin: 'https://frontend.example',
+        resolveDrupalPath: vi
+          .fn()
+          .mockResolvedValue('https://drupal.example/node/123'),
+        setNavigationTimer: (callback) => {
+          navigate = callback;
+          return 11;
+        },
+      });
 
-    const navigation = navigator.navigate('https://frontend.example/first');
-    navigator.destroy();
-    finishLookup?.('https://drupal.example/first');
-    await navigation;
-    await navigator.navigate('https://frontend.example/second');
+      await navigator.navigate('https://frontend.example/node/123');
+      if (openInNewTab) {
+        await navigator.navigate('https://external.example/article', true);
+        expect(openWindow).toHaveBeenCalledExactlyOnceWith(
+          'https://external.example/article',
+          '_blank',
+          'noopener',
+        );
+        expect(clearNavigationTimer).not.toHaveBeenCalled();
+      }
+      navigator.destroy();
+      navigate?.();
 
-    expect(resolveDrupalPath).toHaveBeenCalledOnce();
-    expect(setNavigationTimer).not.toHaveBeenCalled();
-  });
+      expect(clearNavigationTimer).toHaveBeenCalledWith(11);
+      expect(assignLocation).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([false, true])(
+    'ignores pending and subsequent requests after destruction, new tab: %s',
+    async (openInNewTab) => {
+      let finishLookup: ((value: string | null) => void) | undefined;
+      const lookup = new Promise<string | null>((resolve) => {
+        finishLookup = resolve;
+      });
+      const resolveDrupalPath = vi.fn().mockReturnValue(lookup);
+      const setNavigationTimer = vi.fn();
+      const openWindow = vi.fn();
+      const navigator = createDrupalHostNavigator({
+        frontendOrigin: 'https://frontend.example',
+        resolveDrupalPath,
+        setNavigationTimer,
+        openWindow,
+      });
+
+      const navigation = navigator.navigate(
+        'https://frontend.example/first',
+        openInNewTab,
+      );
+      navigator.destroy();
+      finishLookup?.('https://drupal.example/first');
+      await navigation;
+      await navigator.navigate('https://frontend.example/second', openInNewTab);
+
+      expect(resolveDrupalPath).toHaveBeenCalledOnce();
+      expect(setNavigationTimer).not.toHaveBeenCalled();
+      expect(openWindow).not.toHaveBeenCalled();
+    },
+  );
 });
