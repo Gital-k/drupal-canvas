@@ -213,9 +213,23 @@ final class EmbeddedPreviewSubscriberTest extends CanvasKernelTestBase {
       self::assertSame(0, $event->getCacheMaxAge());
       $plugin = $this->container->get('plugin.manager.display_variant')->createInstance($event->getPluginId(), $event->getPluginConfiguration());
       self::assertInstanceOf(EmbeddedHeadlessPreviewPageVariant::class, $plugin);
-      $plugin->setMainContent(['#attached' => ['page_top' => ['node_preview' => ['#markup' => 'Preview controls']]]]);
-      $build = $plugin->build();
-      self::assertSame(['node/drupal.node.preview'], $build['#attached']['library']);
+      // Core attaches the controls through hook_page_top() before Drupal 11.4,
+      // and directly to the main content in Drupal 11.4 and later.
+      foreach ([
+        'page_top controls' => ['page_top' => ['node_preview' => ['#markup' => 'Preview controls']]],
+        'preview library only' => ['library' => ['node/drupal.node.preview']],
+        'both attachments' => [
+          'page_top' => ['node_preview' => ['#markup' => 'Preview controls']],
+          'library' => ['node/drupal.node.preview'],
+        ],
+      ] as $case => $attachments) {
+        $plugin->setMainContent(['#attached' => $attachments]);
+        $build = $plugin->build();
+        self::assertSame(['node/drupal.node.preview'], $build['#attached']['library'] ?? [], $case);
+      }
+      // Other main-content attachments do not enable node preview behaviors.
+      $plugin->setMainContent(['#attached' => ['library' => ['core/drupal']]]);
+      self::assertSame([], $plugin->build()['#attached']['library'] ?? []);
     }
     // A view mode without a Canvas template retains core's preview.
     self::assertSame('simple_page', $this->selectVariant($node, 'entity.node.preview', view_mode: 'teaser')->getPluginId());

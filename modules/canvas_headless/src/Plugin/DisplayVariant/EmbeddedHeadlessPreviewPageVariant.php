@@ -28,7 +28,10 @@ final class EmbeddedHeadlessPreviewPageVariant extends VariantBase implements Pa
    * {@inheritdoc}
    */
   public function setMainContent(array $main_content): static {
-    $this->hasNodePreviewControls = isset($main_content['#attached']['page_top']['node_preview']);
+    // On Drupal < 11.4, only the library is attached here and the controls are
+    // added later through hook_page_top().
+    $this->hasNodePreviewControls = isset($main_content['#attached']['page_top']['node_preview']) ||
+      \in_array('node/drupal.node.preview', $main_content['#attached']['library'] ?? [], TRUE);
     return $this;
   }
 
