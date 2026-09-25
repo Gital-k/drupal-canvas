@@ -1,10 +1,10 @@
 # 21. Code component runtime compatibility across frontend modes
 
-Date: 2026-09-21
+Date: 2026-09-25
 
 ## Status
 
-Proposed.
+Accepted.
 
 ## Context
 
