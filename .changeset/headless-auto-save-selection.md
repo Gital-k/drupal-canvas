@@ -1,6 +1,7 @@
 ---
-"@drupal-canvas/headless": patch
+"@drupal-canvas/headless": minor
 ---
 
-Allow authenticated previews to exclude Canvas auto-saves through the optional
-excludeAutoSave rendering preference.
+Keep preview context specific to each request so tabs do not change each other's
+rendering settings. Authenticated previews can exclude Canvas auto-saves with
+`excludeAutoSave`, and `fetchPage()` accepts explicit preview context.
