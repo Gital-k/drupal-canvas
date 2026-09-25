@@ -918,6 +918,86 @@ class TranslationTest extends FunctionalTestBase {
   }
 
   /**
+   * Tests previewing a translation the user may view but not update.
+   *
+   * The editor edits the default translation; loading another translation's
+   * layout only previews it. Preview requires edit access on the default
+   * translation and 'view' access on the previewed one, whereas editing that
+   * translation still requires 'update' access on it.
+   *
+   * @see \Drupal\canvas\Access\ComponentTreePreviewAccessCheck
+   * @see \Drupal\canvas\Access\ComponentTreeEditAccessCheck
+   */
+  public function testPreviewTranslationAccess(): void {
+    // The canvas_test_access module unconditionally forbids 'view' access on
+    // the canvas_page with ID 1, so ensure the tested page does not get that ID.
+    Page::create(['title' => 'Page 1', 'status' => TRUE])->save();
+    $page = $this->createCanvasTranslationTestPage();
+    $page_id = $page->id();
+    self::assertNotSame('1', $page_id);
+    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_test_access']);
+    $forbid = fn (array $langcodes_by_operation) => \Drupal::keyValue('canvas_test_access')->set('forbidden_langcodes_by_operation', $langcodes_by_operation);
+
+    $user = $this->drupalCreateUser([Page::EDIT_PERMISSION]);
+    \assert($user instanceof UserInterface);
+    $this->drupalLogin($user);
+    $csrf_token = $this->drupalGet('session/token');
+
+    $layout_path = "/canvas/api/v0/layout/canvas_page/$page_id";
+    $get = fn (string $prefix): ResponseInterface => $this->makeApiRequest('GET', Url::fromUri("base:$prefix$layout_path"), []);
+    // Re-saves the heading component with its current model, using the auto-save
+    // hashes from a fresh GET so the PATCH does not trigger a conflict.
+    $heading_uuid = '11111111-1111-4111-8111-111111111111';
+    $heading_type = 'sdc.canvas_test_sdc.heading@' . $this->getHeadingComponentVersion();
+    $patch = function (string $prefix) use ($get, $csrf_token, $layout_path, $heading_uuid, $heading_type): ResponseInterface {
+      $current = json_decode((string) $get($prefix)->getBody(), TRUE);
+      return $this->makeApiRequest('PATCH', Url::fromUri("base:$prefix$layout_path"), [
+        'headers' => ['X-CSRF-Token' => $csrf_token, 'Content-Type' => 'application/json'],
+        'body' => json_encode([
+          'componentInstanceUuid' => $heading_uuid,
+          'componentType' => $heading_type,
+          'model' => $current['model'][$heading_uuid],
+          'autoSaves' => $current['autoSaves'],
+          'clientInstanceId' => 'test-client',
+        ]),
+      ]);
+    };
+    // Returns the first content-region component name from a 200 response.
+    $content_name = function (ResponseInterface $response): ?string {
+      self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+      $layout = json_decode((string) $response->getBody(), TRUE)['layout'];
+      $content_region = current(array_filter($layout, fn($r) => $r['id'] === 'content'));
+      return $content_region['components'][0]['name'];
+    };
+
+    // Baseline: the user may edit both translations.
+    self::assertSame('English heading', $content_name($get('')));
+    self::assertSame('French heading', $content_name($get('/fr')));
+    $response = $patch('/fr');
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+
+    // Without 'update' access on the French translation, previewing it still
+    // works, but editing it does not.
+    $forbid(['update' => ['fr']]);
+    self::assertSame('English heading', $content_name($get('')));
+    self::assertSame('French heading', $content_name($get('/fr')));
+    self::assertSame(403, $patch('/fr')->getStatusCode());
+    $response = $patch('');
+    self::assertSame(200, $response->getStatusCode(), (string) $response->getBody());
+
+    // Without 'view' access on the French translation, it cannot be previewed.
+    $forbid(['view' => ['fr']]);
+    self::assertSame('English heading', $content_name($get('')));
+    self::assertSame(403, $get('/fr')->getStatusCode());
+
+    // Without 'update' access on the default translation, nothing loads: the
+    // editor always edits the default translation.
+    $forbid(['update' => ['en']]);
+    self::assertSame(403, $get('')->getStatusCode());
+    self::assertSame(403, $get('/fr')->getStatusCode());
+  }
+
+  /**
    * Tests canvas_page translation on /fr/page/{id}.
    *
    * Verifies that visiting /fr/page/{id} displays the French translation
