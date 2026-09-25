@@ -68,4 +68,3 @@ lerna-debug.log*
 
 # GitLab CI
 .cache
-g
