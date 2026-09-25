@@ -191,9 +191,15 @@ export default function List() {
 
 The hook returns `null`, with one console warning, when no provider is mounted.
 In Drupal previews the client reads working copies (the `rel:working-copy`
-resource version) through the editor's session; in headless frontends it reaches
+resource version) through the editor's session; in headless browsers it reaches
 Drupal through the application's same-origin proxy, authenticated from the draft
 preview session. Replacing the provided client does not clear SWR caches.
+
+For portable components, use this hook rather than Drupal globals or a client
+with hardcoded URLs or credentials. Drupal, Workbench, and headless React
+integrations supply the client; the hook does not detect the environment. See
+[Writing portable components](../../docs/user/src/content/docs/code-components/data-fetching.mdx#writing-portable-components)
+for an SWR example and server-rendering guidance.
 
 [Drupal core's JSON:API module](https://www.drupal.org/docs/core-modules-and-themes/core-modules/jsonapi-module)
 must be enabled.
