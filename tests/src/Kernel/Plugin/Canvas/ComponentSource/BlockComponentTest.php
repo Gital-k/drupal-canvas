@@ -605,7 +605,7 @@ HTML,
       'resolved' => [],
     ], NULL);
     self::assertSame([
-      'label' => 'Test block form',
+      'label' => 'N/A',
       // This confusingly isn't a boolean, because that what its config schema dictates.
       // @see `type: block_settings`
       // @todo Remove after https://drupal.org/i/2544708 is fixed.
@@ -624,7 +624,7 @@ HTML,
     // Confirm that block validation and submit methods are called.
     self::assertEquals([
       'canvas_page' => $page1->id(),
-      'label' => 'Test block form',
+      'label' => 'N/A',
       // This confusingly isn't a boolean, because that what its config schema dictates.
       // @see `type: block_settings`
       // @todo Remove after https://drupal.org/i/2544708 is fixed.

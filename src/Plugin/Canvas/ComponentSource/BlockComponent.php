@@ -78,6 +78,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
   public const SOURCE_PLUGIN_ID = 'block';
   public const EXPLICIT_INPUT_NAME = 'settings';
 
+  private const ENFORCED_BLOCK_LABEL_CONFIG = [
+    // @see ::buildAnonymousFormForBlockPlugin()
+    'label' => 'N/A',
+    // @see `type: block_settings`
+    'label_display' => '0',
+  ];
+
   /**
    * Constructs a new BlockComponent.
    *
@@ -332,9 +339,13 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
    * {@inheritdoc}
    */
   public function getExplicitInput(string $uuid, ComponentTreeItem $item, ?FieldableEntityInterface $host_entity = NULL): array {
-
     try {
-      return $item->getInputs() ?? [];
+      return $item->getInputs() ?? [] + [
+        // @see ::buildAnonymousFormForBlockPlugin()
+        'label' => 'N/A',
+        // @see `type: block_settings`
+        'label_display' => '0',
+      ];
     }
     catch (MissingComponentInputsException) {
       // There is no input for this component. That should only be the case for
@@ -373,10 +384,7 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
         // We always pass along the explicit input for label and label_display
         // as we've removed these from the form in
         // ::buildAnonymousFormForBlockPlugin.
-      \array_intersect_key($explicit_input, \array_flip([
-        'label',
-        'label_display',
-      ])),
+        self::ENFORCED_BLOCK_LABEL_CONFIG
     ];
   }
 
@@ -420,6 +428,10 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
     // want them to factor into the calculation of the input values or client
     // model. The value of these keys are added back to the input
     // in ::clientModelToInput so we can safely remove them.
+    // Only 2 of the 3 are also part of `type: block_settings` (label,
+    // label_display). The third (admin_label) is part of the Block config
+    // entity type.
+    // @see ::ENFORCED_BLOCK_LABEL_CONFIG
     foreach (['label', 'admin_label', 'label_display'] as $field) {
       unset($form['settings'][$field]);
     }
@@ -460,23 +472,17 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
       $client_model['resolved'] = $defaults;
     }
     $input = $client_model['resolved'] ?? [];
-    $label_input = \array_intersect_key($input, \array_flip([
-      // We remove these from the form in ::submitBlockConfigurationForm and
-      // ::buildConfigurationForm, so let's make note of their values before
-      // submitting the form.
-      'label',
-      'label_display',
-    ]));
 
     $block_plugin = $this->getBlockPlugin();
     $this->submitBlockConfigurationForm($block_plugin, $component_instance_uuid, $input);
-    $input = $label_input + \array_intersect_key(
+    // Ignore any submitted values for label/label_display as we don't show
+    // those fields to the user and will just use ENFORCED_BLOCK_LABEL_CONFIG.
+    // @see ::submitBlockConfigurationForm()
+    // @see ::buildConfigurationForm()
+    $input = self::ENFORCED_BLOCK_LABEL_CONFIG + \array_intersect_key(
       // Ignore any keys from configuration that don't exist in configuration.
       $block_plugin->getConfiguration(),
-      // But also ignore any submitted values for label/label_display as we
-      // don't show those fields to the user and will fill them from
-      // $label_input.
-      \array_diff_key($defaults, \array_flip(['label', 'label_display']))
+      $defaults,
     );
 
     // We don't need to store these as they can be recalculated based on the
@@ -490,9 +496,6 @@ final class BlockComponent extends ComponentSourceBase implements ContainerFacto
    * {@inheritdoc}
    */
   public function validateComponentInput(array $inputValues, string $component_instance_uuid, ?FieldableEntityInterface $entity): ConstraintViolationListInterface {
-    if (!$this->requiresExplicitInput()) {
-      return new ConstraintViolationList();
-    }
     $block_plugin = $this->getBlockPlugin();
     $plugin_id = $block_plugin->getPluginId();
     $definition = $block_plugin->getPluginDefinition();
