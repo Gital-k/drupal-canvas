@@ -288,6 +288,9 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
       'test_create_access_cache_tag',
       // @see \Drupal\block\Plugin\DisplayVariant\BlockPageVariant
       'config:block_list',
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
+      'config:canvas.asset_library.global',
+      'config:canvas.brand_kit.global',
     ], $response->getCacheableMetadata()->getCacheTags());
 
     $this->assertTitle('Audit of Canvas test SDC with props and slots usages | ');
@@ -330,6 +333,9 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
       'test_create_access_cache_tag',
       // @see \Drupal\block\Plugin\DisplayVariant\BlockPageVariant
       'config:block_list',
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
+      'config:canvas.asset_library.global',
+      'config:canvas.brand_kit.global',
     ], $response->getCacheableMetadata()->getCacheTags());
 
     $this->assertTitle('Audit of Druplicon usages | ');
