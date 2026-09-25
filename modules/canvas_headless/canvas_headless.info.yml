@@ -3,8 +3,6 @@ name: Drupal Canvas Headless
 description: 'Embeds a decoupled frontend app in the Canvas editor frame, with draft-mode preview via user-bound preview tokens (RFC 7523 assertion grant).'
 package: Drupal Canvas
 core_version_requirement: ^11.3
-lifecycle: experimental
-hidden: true
 dependencies:
   - canvas:canvas
   - simple_oauth:simple_oauth (>=6.1.0)
