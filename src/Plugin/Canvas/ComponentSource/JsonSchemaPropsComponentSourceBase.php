@@ -549,7 +549,8 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       // after the Content Author removes all items mid-edit) or because the
       // items are objects where scalars are expected (e.g. a `link` field
       // leaking its raw `{uri, options}` structure instead of a URL string).
-      // Fall back to a valid value so the component still renders while editing.
+      // Fall back to a valid value so the component still renders
+      // while editing.
       if ($is_required && \is_array($resolved_value->value) && \array_key_exists($prop, $active_required_explicit_inputs)) {
         $needs_fallback = $resolved_value->value === [];
         if (!$needs_fallback && !empty($resolved_value->value)) {

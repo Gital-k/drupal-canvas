@@ -8014,7 +8014,7 @@ HTML
     );
 
     // The empty array must be replaced with a non-empty default value.
-    $data_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['data'];
+    $data_result = $hydrated[JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME]['data'];
     $this->assertInstanceOf(EvaluationResult::class, $data_result);
     $this->assertIsArray($data_result->value);
     $this->assertNotEmpty($data_result->value);
@@ -8062,7 +8062,7 @@ HTML
     );
 
     // The empty array must be replaced with the metadata example.
-    $links_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
+    $links_result = $hydrated[JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
     $this->assertInstanceOf(EvaluationResult::class, $links_result);
     $this->assertSame(['/about', '/contact'], $links_result->value);
 
@@ -8109,7 +8109,7 @@ HTML
     );
 
     // The object array must be replaced with the metadata example.
-    $links_result = $hydrated[GeneratedFieldExplicitInputUxComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
+    $links_result = $hydrated[JsonSchemaPropsComponentSourceBase::EXPLICIT_INPUT_NAME]['links'];
     $this->assertInstanceOf(EvaluationResult::class, $links_result);
     $this->assertSame(['/about', '/contact'], $links_result->value);
 
