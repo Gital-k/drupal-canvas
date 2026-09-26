@@ -58,8 +58,10 @@ window.addEventListener('message', function (event) {
       if (blobUrlCache[realUrl]) {
         return blobUrlCache[realUrl];
       }
-      var rewritten = files[realUrl].replace(/\\bfrom(\\s*)(["'])(\\.\\.?\\/[^"']*)\\2/g, function (fullMatch, spacing, quote, specifier) {
-        return 'from' + spacing + quote + getBlobUrl(new URL(specifier, realUrl).href) + quote;
+      // Same pattern as Preview.tsx's RELATIVE_IMPORT_PATTERN: `from"./x"`,
+      // side-effect `import"./x"` and dynamic `import("./x")` specifiers.
+      var rewritten = files[realUrl].replace(/\\b(from|import)(\\s*\\(?\\s*)(["'])(\\.\\.?\\/[^"']*)\\3/g, function (fullMatch, keyword, spacing, quote, specifier) {
+        return keyword + spacing + quote + getBlobUrl(new URL(specifier, realUrl).href) + quote;
       });
       var blobUrl = URL.createObjectURL(new Blob([rewritten], { type: 'text/javascript' }));
       blobUrlCache[realUrl] = blobUrl;

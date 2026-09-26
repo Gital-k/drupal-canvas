@@ -71,10 +71,15 @@ function getPreviewScriptSource(): Promise<Blob> {
   return previewScriptSourcePromise;
 }
 
-// Matches a bundler-emitted `from"./foo.js"` / `from '../foo.js'` inside an
-// `import`/`export ... from` statement — used by `discoverFiles()` below to
-// find a file's own relative imports.
-const RELATIVE_IMPORT_PATTERN = /\bfrom(\s*)(["'])(\.\.?\/[^"']*)\2/g;
+// Matches a bundler-emitted relative import specifier: `from"./foo.js"` /
+// `from '../foo.js'` inside an `import`/`export ... from` statement, a
+// side-effect `import"./foo.js"`, or a dynamic `import("./foo.js")` — used
+// by `discoverFiles()` below to find a file's own relative imports. The
+// specifier is capture group 4. Keep in sync with the shell's copy, which
+// rewrites the same specifiers.
+// @see \Drupal\canvas\Controller\CodeEditorPreviewController::HTML
+const RELATIVE_IMPORT_PATTERN =
+  /\b(from|import)(\s*\(?\s*)(["'])(\.\.?\/[^"']*)\3/g;
 
 // Recursively fetches a JS file's own relative-imported siblings
 // (Vite/Rollup-built chunks sometimes import a shared sibling this way,
@@ -111,7 +116,7 @@ async function discoverFiles(
       const text = await (await fetch(absoluteUrl)).text();
       files.set(absoluteUrl, text);
       const relativeSpecifiers = new Set(
-        [...text.matchAll(RELATIVE_IMPORT_PATTERN)].map((match) => match[3]),
+        [...text.matchAll(RELATIVE_IMPORT_PATTERN)].map((match) => match[4]),
       );
       await Promise.all(
         [...relativeSpecifiers].map((specifier) =>
