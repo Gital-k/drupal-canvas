@@ -23,11 +23,35 @@ const DrupalRadioGroup = ({
   attributes?: Attributes;
   children?: React.ReactNode;
 }) => {
+  // Do not use `||` to fall back to the next candidate: a radio group whose
+  // selected value is '0' is perfectly valid, but '0' is falsy in JavaScript
+  // and would be discarded, leaving the group with nothing selected. Only an
+  // absent value ('' is what canvas_stark renders when there is no default)
+  // may fall through.
+  // @see canvas_stark_preprocess_radios()
+  const defaultValue =
+    (attributes.value as string | null | undefined) ??
+    (attributes['data-canvas-radio-default-value'] as
+      | string
+      | null
+      | undefined);
+  const initialValue =
+    defaultValue === undefined || defaultValue === '' ? null : defaultValue;
   const [selected, setSelected] = useState<string | number | null>(
-    (attributes.value as string | null) ||
-      (attributes['data-canvas-radio-default-value'] as string | null) ||
-      null,
+    initialValue,
   );
+
+  // Adjust the selection when the group is re-rendered with a different value
+  // than the one it was last rendered with. The form is re-fetched after
+  // publishing, and without this the state from the previous render would win,
+  // leaving the group showing a value that is no longer the stored one.
+  const [renderedValue, setRenderedValue] = useState<string | number | null>(
+    initialValue,
+  );
+  if (initialValue !== renderedValue) {
+    setRenderedValue(initialValue);
+    setSelected(initialValue);
+  }
 
   const fieldContext = useFieldContext();
 
@@ -70,18 +94,20 @@ const DrupalRadioItem = ({ attributes = {} }: { attributes?: Attributes }) => {
       : undefined,
   );
 
+  const isChecked = `${selected}` === `${valueRef.current}`;
+
   return (
     <RadioItem
       attributes={{
         ...attributes,
         value: `${valueRef.current}`,
-        checked: `${selected}` === `${valueRef.current}`,
+        checked: isChecked,
         // The checked attribute does not reliably appear in the DOM despite
         // the element itself having the checked property as `true` and the
         // input rendering as checked. This has no functional impact outside
         // of tests that are looking to confirm the input is set as checked, so
         // we add this attribute to make the checked status known via DOM query.
-        'data-drupal-canvas-checked': `${selected}` === `${valueRef.current}`,
+        'data-drupal-canvas-checked': isChecked,
       }}
       onChange={() => updateSelected(valueRef.current)}
     />

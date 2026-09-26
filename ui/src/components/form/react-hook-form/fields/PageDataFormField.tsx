@@ -131,6 +131,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
         );
         const displayError = blockingError || fieldState.error;
 
+        const hasError = !!displayError;
         const enhancedProps = useMemo(
           () =>
             applyEnhancedProps(
@@ -141,7 +142,7 @@ export const PageDataFormField = <P extends Record<string, any>>({
               !!displayError,
             ),
           // eslint-disable-next-line react-hooks/exhaustive-deps
-          [field, field.value, stableOnChange, stableOnBlur, !!displayError],
+          [props, field, field.value, stableOnChange, stableOnBlur, hasError],
         );
 
         return (
