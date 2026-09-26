@@ -23,7 +23,12 @@ import {
 import type { CanvasContext, JsonApiRuntimeConfig } from 'drupal-canvas';
 
 const context: CanvasContext = {
-  page: { pageTitle: 'Draft page', breadcrumbs: [], mainEntity: null },
+  page: {
+    pageTitle: 'Draft page',
+    breadcrumbs: [],
+    mainEntity: null,
+    currentPath: null,
+  },
   site: {
     branding: { homeUrl: '/', siteName: 'Site', siteSlogan: '' },
     baseUrl: 'https://drupal.example',

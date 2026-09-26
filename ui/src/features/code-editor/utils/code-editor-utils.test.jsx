@@ -747,6 +747,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.breadcrumbs',
         'v0.pageTitle',
         'v0.mainEntity',
+        'v0.currentPath',
       ],
     });
   });
@@ -799,6 +800,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.breadcrumbs',
         'v0.pageTitle',
         'v0.mainEntity',
+        'v0.currentPath',
         'v0.baseUrl',
         'v0.branding',
       ],
@@ -817,6 +819,7 @@ describe('getDataDependenciesFromAst', () => {
         'v0.breadcrumbs',
         'v0.pageTitle',
         'v0.mainEntity',
+        'v0.currentPath',
         'v0.baseUrl',
         'v0.branding',
         'v0.themeAssets',

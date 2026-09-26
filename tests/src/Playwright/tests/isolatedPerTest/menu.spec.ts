@@ -30,7 +30,10 @@ test.describe('Menu Component', () => {
     await canvas.createCodeComponent('Menu', code);
     const preview = canvas.getCodePreviewFrame();
 
-    await expect(preview).toContainText('JSON:API Menu');
+    // The preview iframe renders via postMessage() and a dynamic import of
+    // the compiled JS, which routinely exceeds the default 10s expect
+    // timeout under CI load.
+    await expect(preview).toContainText('JSON:API Menu', { timeout: 30_000 });
     await expect(preview).toContainText('Core Linkset Menu');
     const menus = await preview.getByTestId('menu').all();
     for (const menu of menus) {

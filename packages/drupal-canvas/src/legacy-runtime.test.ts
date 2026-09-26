@@ -77,6 +77,7 @@ describe('legacy runtime guards', () => {
         pageTitle: 'Title',
         breadcrumbs: [],
         mainEntity: null,
+        currentPath: null,
       });
       expect(getSiteData().branding.siteName).toBe('Site');
       const client = new JsonApiClient();

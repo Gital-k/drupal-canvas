@@ -16,10 +16,20 @@ const DATA_DEPENDENCY_SOURCES = new Set([
 const DATA_DEPENDENCY_MAP: Record<string, string[]> = {
   JsonApiClient: ['v0.baseUrl', 'v0.jsonapiSettings'],
   getSiteData: ['v0.baseUrl', 'v0.branding'],
-  getPageData: ['v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity'],
+  getPageData: [
+    'v0.breadcrumbs',
+    'v0.pageTitle',
+    'v0.mainEntity',
+    'v0.currentPath',
+  ],
   useJsonApiClient: ['v0.baseUrl', 'v0.jsonapiSettings'],
   useSiteContext: ['v0.baseUrl', 'v0.branding', 'v0.themeAssets'],
-  usePageContext: ['v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity'],
+  usePageContext: [
+    'v0.breadcrumbs',
+    'v0.pageTitle',
+    'v0.mainEntity',
+    'v0.currentPath',
+  ],
 };
 
 const isNode = (value: unknown): value is Node =>

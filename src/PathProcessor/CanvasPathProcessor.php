@@ -23,14 +23,20 @@ class CanvasPathProcessor implements InboundPathProcessorInterface {
    * {@inheritdoc}
    */
   public function processInbound($path, Request $request): string {
-    // Only rewrite if not /canvas/api or /canvas/content-api and starts with
-    // /canvas/. For this to work, our routes require that no route
-    // normalization happens when the redirect module is enabled.
+    // Only rewrite if not /canvas/api, not /canvas/content-api, not
+    // /canvas/code-editor-preview, and starts with /canvas/.
+    // /canvas/code-editor-preview and its sub-paths are real server-rendered
+    // routes, not React-router-handled deep links, so they must reach their
+    // own routes unmodified.
+    // @see \Drupal\canvas\Controller\CodeEditorPreviewController
+    // For this to work, our routes require that no route normalization happens
+    // when the redirect module is enabled.
     // @see \Drupal\canvas\EventSubscriber\CanvasRouteOptionsEventSubscriber::preventRouteNormalization.
     if (
       str_starts_with($path, '/canvas/') &&
       !str_starts_with($path, '/canvas/api') &&
-      !str_starts_with($path, '/canvas/content-api/')
+      !str_starts_with($path, '/canvas/content-api/') &&
+      !str_starts_with($path, '/canvas/code-editor-preview')
     ) {
       // Page extension paths must reach their own route so per-extension
       // access checking applies. Strip any extension-internal subpath

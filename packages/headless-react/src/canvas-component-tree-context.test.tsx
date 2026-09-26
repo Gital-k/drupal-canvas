@@ -17,7 +17,12 @@ import { CanvasComponentTree } from './canvas-component-tree';
 import type { CanvasContext } from 'drupal-canvas';
 
 const context: CanvasContext = {
-  page: { pageTitle: 'From tree', breadcrumbs: [], mainEntity: null },
+  page: {
+    pageTitle: 'From tree',
+    breadcrumbs: [],
+    mainEntity: null,
+    currentPath: null,
+  },
   site: {
     branding: { homeUrl: '/', siteName: 'Tree site', siteSlogan: '' },
     baseUrl: 'https://drupal.example',
@@ -26,7 +31,12 @@ const context: CanvasContext = {
 };
 
 const outerContext: CanvasContext = {
-  page: { pageTitle: 'From outer', breadcrumbs: [], mainEntity: null },
+  page: {
+    pageTitle: 'From outer',
+    breadcrumbs: [],
+    mainEntity: null,
+    currentPath: null,
+  },
   site: {
     ...context.site!,
     branding: { ...context.site!.branding, siteName: 'Outer site' },

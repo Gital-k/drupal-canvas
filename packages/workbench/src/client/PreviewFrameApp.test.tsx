@@ -262,6 +262,7 @@ describe('PreviewFrameApp', () => {
       pageTitle: '',
       breadcrumbs: [],
       mainEntity: null,
+      currentPath: null,
     });
     expect(seen.at(-1)?.site).toEqual({
       branding: {

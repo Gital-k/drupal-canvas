@@ -32,7 +32,12 @@ describe('drupalSettings to context', () => {
         mainEntity: null,
       }),
     ).toEqual({
-      page: { pageTitle: '', breadcrumbs: [], mainEntity: null },
+      page: {
+        pageTitle: '',
+        breadcrumbs: [],
+        mainEntity: null,
+        currentPath: null,
+      },
       site: null,
     });
     expect(

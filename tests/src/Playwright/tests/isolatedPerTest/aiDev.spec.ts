@@ -137,8 +137,13 @@ test.describe('AI dev chat', () => {
         '[data-testid="canvas-code-editor-main-panel"] div[role="textbox"]',
       ),
     ).toContainText('export default function RedButton');
-    // The source compiled and rendered, using the prop's example value.
-    await expect(preview.locator('button')).toHaveText('Click here');
+    // The source compiled and rendered, using the prop's example value. The
+    // preview iframe renders via postMessage() and a dynamic import of the
+    // compiled JS, which routinely exceeds the default 10s expect timeout
+    // under CI load.
+    await expect(preview.locator('button')).toHaveText('Click here', {
+      timeout: 30_000,
+    });
     await expect(preview.locator('.bg-red-600')).toHaveCount(1);
 
     // The user then asks for a change. This turn takes three requests: the

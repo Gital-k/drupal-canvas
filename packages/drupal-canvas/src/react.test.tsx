@@ -47,7 +47,12 @@ describe('React entry point', () => {
   it('shares provider state across the entry point and internal hooks', () => {
     const props: CanvasContextProviderProps = {
       context: {
-        page: { pageTitle: 'React entry', breadcrumbs: [], mainEntity: null },
+        page: {
+          pageTitle: 'React entry',
+          breadcrumbs: [],
+          mainEntity: null,
+          currentPath: null,
+        },
         site: null,
       },
     };

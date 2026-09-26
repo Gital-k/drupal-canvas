@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Box } from '@radix-ui/themes';
 
 import { useAppDispatch, useAppSelector } from '@/app/hooks';
@@ -12,6 +12,7 @@ import {
   setDialogClosed,
   setDialogOpen,
 } from '@/features/ui/dialogSlice';
+import { getIframeSandbox } from '@/utils/iframe-sandbox';
 
 import type React from 'react';
 
@@ -33,6 +34,12 @@ const ExtensionDialog: React.FC<ExtensionDialogProps> = () => {
     },
     [dispatch],
   );
+
+  const sandbox = useMemo(
+    () => getIframeSandbox(activeExtension?.url, 'allow-scripts'),
+    [activeExtension?.url],
+  );
+
   if (!extension || activeExtension === null) {
     return null;
   }
@@ -50,8 +57,7 @@ const ExtensionDialog: React.FC<ExtensionDialogProps> = () => {
     >
       {url ? (
         <iframe
-          // @todo Only add 'allow-same-origin' if the extension is loaded from a local file.
-          sandbox="allow-scripts allow-same-origin"
+          sandbox={sandbox}
           id={`canvas-extension-iframe-${id}`}
           src={url}
           style={{

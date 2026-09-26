@@ -2,7 +2,10 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { JsonApiClient } from '@drupal-api-client/json-api-client';
 
-import { sortMenu as drupalSortMenu } from '@/lib/drupal-utils';
+import {
+  getPageData,
+  sortMenu as drupalSortMenu,
+} from '@/lib/drupal-utils';
 import { sortMenu as jsonapiSortMenu } from '@/lib/jsonapi-utils';
 import { cn } from '@/lib/utils';
 
@@ -142,7 +145,7 @@ const MenuItems = ({ menu }: { menu: BaseMenuItem[] }) => {
               >
                 <a
                   href={menuItem.url ?? menuItem.href ?? '#'}
-                  className={`p-2 text-sm text-blue-600 focus:text-blue-600 focus:outline-none dark:text-blue-500 dark:focus:text-blue-500 ${window.parent.location.pathname === menuItem.url || window.parent.location.pathname === menuItem.href ? 'bg-blue-50 rounded' : ''}`}
+                  className={`p-2 text-sm text-blue-600 focus:text-blue-600 focus:outline-none dark:text-blue-500 dark:focus:text-blue-500 ${getPageData().currentPath === menuItem.url || getPageData().currentPath === menuItem.href ? 'bg-blue-50 rounded' : ''}`}
                   aria-expanded={menuItem._hasSubmenu ? isOpen : undefined}
                 >
                   {menuItem.title}

@@ -972,6 +972,47 @@ canvas.boot.entity:
         type: entity:{entity_type}
     _format: 'json'
 
+canvas.code_editor_preview.import_map:
+  # Serves the import map entries (preact, react, clsx, etc.) the preview
+  # script needs to resolve its own bare-specifier imports, as plain JSON.
+  # Fetched by the parent window — a sandboxed, opaque-origin document has
+  # no classifiable network address space, and the browser blocks any
+  # subresource fetch it makes to a private network target (this site's own
+  # host) outright, before the request is even sent.
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::importMap()
+  path: '/canvas/code-editor-preview/import-map'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::importMap'
+  requirements:
+    _access: 'TRUE'
+
+canvas.code_editor_preview.script:
+  # Serves ui/dist/assets/code-editor-preview.js. Fetched by the parent
+  # window, for the same reason as the route above.
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::script()
+  path: '/canvas/code-editor-preview/script.js'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::script'
+  requirements:
+    _access: 'TRUE'
+
+canvas.code_editor_preview.shell:
+  # The code editor preview iframe's document, served from its own route so
+  # it can run with an opaque origin (sandbox="allow-scripts", no
+  # allow-same-origin) instead of inheriting the parent app's origin.
+  # Reachable without authentication: this is Canvas's own fixed, non-secret,
+  # unauthenticated shell, not the dynamic per-component payload (sent by the
+  # parent via postMessage() instead).
+  # @see \Drupal\canvas\Controller\CodeEditorPreviewController::shell()
+  # @see ui/src/features/code-editor/Preview.tsx
+  # @see https://www.drupal.org/i/3527515
+  path: '/canvas/code-editor-preview'
+  defaults:
+    _controller: 'Drupal\canvas\Controller\CodeEditorPreviewController::shell'
+    _title: 'Code editor preview'
+  requirements:
+    _access: 'TRUE'
+
 canvas.component.status:
   path: '/admin/appearance/component/status'
   defaults:

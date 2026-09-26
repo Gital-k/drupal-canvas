@@ -66,6 +66,7 @@ test.describe('Context hooks', () => {
     );
     expect(Object.keys(settings).sort()).toEqual([
       'breadcrumbs',
+      'currentPath',
       'mainEntity',
       'pageTitle',
     ]);

@@ -274,6 +274,8 @@ final class ComponentAuditControllerTest extends CanvasKernelTestBase {
       'url.query_args:_wrapper_format',
       // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
       'route.name',
+      // @see \Drupal\canvas\Hook\ComponentSourceHooks::pageAttachments()
+      'url.path',
     ];
     self::assertEqualsCanonicalizing($expected_cache_contexts, $response->getCacheableMetadata()->getCacheContexts());
     self::assertEqualsCanonicalizing([

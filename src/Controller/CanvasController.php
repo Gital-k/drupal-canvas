@@ -279,6 +279,9 @@ HTML;
           'canvasData' => [
             'v0' => [
               'pageTitle' => 'This is a page title for testing purposes',
+              // There is no real "current page" being viewed in the code
+              // editor, so no link should ever match it as active.
+              'currentPath' => NULL,
               'breadcrumbs' => [
                 0 => [
                   'key' => '<front>',

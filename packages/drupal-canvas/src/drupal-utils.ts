@@ -115,6 +115,10 @@ export interface PageData {
   pageTitle: string;
   breadcrumbs: Array<BreadcrumbLink>;
   mainEntity: EntityMetadata | null;
+  // The current page's path, e.g. to highlight the matching link in a menu.
+  // `null` where there is no real current page, such as in the code editor's
+  // own preview.
+  currentPath: string | null;
 }
 
 export interface ThemeAssets {
@@ -148,12 +152,19 @@ export const getPageData = (): PageData => {
     pageTitle: globalThis?.drupalSettings?.canvasData?.v0?.pageTitle || '',
     breadcrumbs: globalThis?.drupalSettings?.canvasData?.v0?.breadcrumbs || [],
     mainEntity: globalThis?.drupalSettings?.canvasData?.v0?.mainEntity || null,
+    currentPath:
+      globalThis?.drupalSettings?.canvasData?.v0?.currentPath || null,
   };
-  globalThis?.window?.parent.postMessage({
-    type: '_canvas_useswr_data_fetch',
-    id: 'getPageData()',
-    data: pageData,
-  });
+  // Explicit '*': called from a sandboxed, opaque-origin preview iframe,
+  // which cannot know or assert the parent's real origin.
+  globalThis?.window?.parent.postMessage(
+    {
+      type: '_canvas_useswr_data_fetch',
+      id: 'getPageData()',
+      data: pageData,
+    },
+    '*',
+  );
   return pageData;
 };
 
@@ -181,10 +192,15 @@ export const getSiteData = (): SiteData => {
       favicon: { url: '', mimeType: '' },
     },
   };
-  globalThis?.window?.parent.postMessage({
-    type: '_canvas_useswr_data_fetch',
-    id: 'getSiteData()',
-    data: siteData,
-  });
+  // Explicit '*': called from a sandboxed, opaque-origin preview iframe,
+  // which cannot know or assert the parent's real origin.
+  globalThis?.window?.parent.postMessage(
+    {
+      type: '_canvas_useswr_data_fetch',
+      id: 'getSiteData()',
+      data: siteData,
+    },
+    '*',
+  );
   return siteData;
 };

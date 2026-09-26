@@ -4,6 +4,7 @@ import { ArrowLeftIcon } from '@radix-ui/react-icons';
 import { IconButton } from '@radix-ui/themes';
 
 import { getCanvasSettings } from '@/utils/drupal-globals';
+import { getIframeSandbox } from '@/utils/iframe-sandbox';
 
 import type React from 'react';
 import type { PageExtension } from '@drupal-canvas/types';
@@ -28,6 +29,11 @@ const ExtensionPage: React.FC = () => {
     return subPath ? `${ext.extension_url}#/${subPath}` : ext.extension_url;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [extensionId]);
+
+  const sandbox = useMemo(
+    () => getIframeSandbox(ext?.extension_url, 'allow-scripts allow-downloads'),
+    [ext],
+  );
 
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
@@ -91,8 +97,7 @@ const ExtensionPage: React.FC = () => {
       <iframe
         key={extensionId}
         ref={iframeRef}
-        // @todo Only add 'allow-same-origin' if the extension is loaded from a local file.
-        sandbox="allow-scripts allow-same-origin allow-downloads"
+        sandbox={sandbox}
         id={`canvas-extension-page-${ext.id}`}
         src={iframeSrc}
         className={styles.iframe}

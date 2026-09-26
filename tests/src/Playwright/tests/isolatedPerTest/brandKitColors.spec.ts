@@ -352,10 +352,15 @@ test.describe('brand kit colors', () => {
       /background-color: rgba\(255, 255, 0, 0.9\)/,
     );
     await page.locator(SEL.form.save).click();
-    // Assert the row swatch style includes the new yellow color
+    // Assert the row swatch style includes the new yellow color. By this
+    // point the test has already driven three round-trip PATCH+refetch
+    // cycles in quick succession (the duplicate-variable-name rejection, the
+    // rename save, and this color-value save), which routinely exceeds the
+    // default 10s expect timeout under CI load.
     await expect(page.locator(SEL.rowSwatch('Brand Blue'))).toHaveAttribute(
       'style',
       /background-color: rgba\(255, 255, 0, 0.9\)/,
+      { timeout: 30_000 },
     );
 
     // - Rename "Brand Blue" to "Brand Yellow"

@@ -23,6 +23,7 @@ describe('Workbench context', () => {
       pageTitle: '',
       breadcrumbs: [],
       mainEntity: null,
+      currentPath: null,
     });
     expect(context.site?.branding.siteName).toBe('Site');
     expect(context.site?.baseUrl).toBe('https://drupal.example');

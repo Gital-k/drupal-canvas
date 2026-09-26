@@ -6,21 +6,29 @@ export default function canvasUseSwr(key: any, fetcher: any, options: any) {
       const swr = useSWRNext(key, fetcher, config);
       const id = decodeURIComponent(JSON.stringify(key));
 
+      // Explicit '*': called from a sandboxed, opaque-origin preview iframe,
+      // which cannot know or assert the parent's real origin.
       if (swr.data !== undefined && !swr.isLoading) {
-        globalThis?.window?.parent.postMessage({
-          type: '_canvas_useswr_data_fetch',
-          id,
-          data: swr.data,
-        });
+        globalThis?.window?.parent.postMessage(
+          {
+            type: '_canvas_useswr_data_fetch',
+            id,
+            data: swr.data,
+          },
+          '*',
+        );
       }
 
       if (swr.error) {
-        globalThis?.window?.parent.postMessage({
-          type: '_canvas_useswr_error',
-          id,
-          data: swr.error,
-          error: true,
-        });
+        globalThis?.window?.parent.postMessage(
+          {
+            type: '_canvas_useswr_error',
+            id,
+            data: swr.error,
+            error: true,
+          },
+          '*',
+        );
       }
 
       return swr;

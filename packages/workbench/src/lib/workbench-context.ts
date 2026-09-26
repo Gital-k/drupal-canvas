@@ -17,6 +17,7 @@ export const WORKBENCH_PAGE_CONTEXT: NonNullable<CanvasContext['page']> = {
   pageTitle: '',
   breadcrumbs: [],
   mainEntity: null,
+  currentPath: null,
 };
 
 const EMPTY_THEME_ASSETS = {

@@ -23,11 +23,11 @@ final class CanvasConfigUpdaterDataDependenciesTest extends CanvasKernelTestBase
   public static function provideSources(): \Generator {
     yield 'legacy getters' => [
       "import { getPageData, getSiteData } from 'drupal-canvas';",
-      ['v0.baseUrl', 'v0.branding', 'v0.breadcrumbs', 'v0.pageTitle'],
+      ['v0.baseUrl', 'v0.branding', 'v0.breadcrumbs', 'v0.pageTitle', 'v0.currentPath'],
     ];
     yield 'context hooks' => [
       "import { usePageContext, useSiteContext, useJsonApiClient } from 'drupal-canvas/react';",
-      ['v0.baseUrl', 'v0.branding', 'v0.themeAssets', 'v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity', 'v0.jsonapiSettings'],
+      ['v0.baseUrl', 'v0.branding', 'v0.themeAssets', 'v0.breadcrumbs', 'v0.pageTitle', 'v0.mainEntity', 'v0.currentPath', 'v0.jsonapiSettings'],
     ];
     yield 'no data APIs' => [
       "import { cn } from 'drupal-canvas';",

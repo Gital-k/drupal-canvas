@@ -27,8 +27,15 @@ export default function ComponentData({
   // Listen for messages from the code editor preview iframe.
   useEffect(() => {
     const handleMessage = (event: any) => {
-      // Ensure the message is from the expected source
-      if (event.origin !== window.location.origin) {
+      // The preview iframe is sandboxed with an opaque origin (no
+      // allow-same-origin), so `event.origin` is always the literal string
+      // 'null' and can't be checked against `window.location.origin`.
+      // Validate the sender by identity instead.
+      // @see ui/src/features/code-editor/Preview.tsx
+      const previewIframe = document.querySelector<HTMLIFrameElement>(
+        'iframe[data-canvas-iframe="canvas-code-editor-preview"]',
+      );
+      if (event.source !== previewIframe?.contentWindow) {
         return;
       }
       switch (event.data?.type) {

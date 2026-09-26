@@ -22,6 +22,7 @@ export interface CanvasDataV0 {
       : never
     : never;
   mainEntity?: NonNullable<CanvasContext['page']>['mainEntity'];
+  currentPath?: string | null;
   branding?: NonNullable<CanvasContext['site']>['branding'] | null;
   baseUrl?: string | null;
   themeAssets?: NonNullable<CanvasContext['site']>['themeAssets'] | null;
@@ -51,7 +52,8 @@ const EMPTY_THEME_ASSETS = {
  * Builds the page and site context from `drupalSettings.canvasData.v0`.
  *
  * Page context is available when Drupal attached any page-level key
- * (`pageTitle`, `breadcrumbs`, or `mainEntity`); site context when it attached
+ * (`pageTitle`, `breadcrumbs`, `mainEntity`, or `currentPath`); site context
+ * when it attached
  * `branding`. Missing keys inside an available group take the same defaults
  * as the legacy getters.
  */
@@ -62,7 +64,10 @@ export function drupalSettingsToCanvasContext(
     return { page: null, site: null };
   }
   const hasPage =
-    'pageTitle' in v0 || 'breadcrumbs' in v0 || 'mainEntity' in v0;
+    'pageTitle' in v0 ||
+    'breadcrumbs' in v0 ||
+    'mainEntity' in v0 ||
+    'currentPath' in v0;
   const hasSite = 'branding' in v0;
   return {
     page: hasPage
@@ -70,6 +75,7 @@ export function drupalSettingsToCanvasContext(
           pageTitle: v0.pageTitle || '',
           breadcrumbs: v0.breadcrumbs || [],
           mainEntity: v0.mainEntity || null,
+          currentPath: v0.currentPath || null,
         }
       : null,
     site: hasSite
