@@ -733,6 +733,12 @@ final class JsComponent extends JsonSchemaPropsComponentSourceBase implements Ur
     if (\in_array($url, self::EXAMPLE_URL_ALLOW_LIST, TRUE)) {
       return;
     }
+    // Allow root-relative paths (e.g. managed files under /sites/default/files)
+    // which resolve on the current host at runtime; reject scheme-relative
+    // "//host" URLs, which stay ambiguous.
+    if (str_starts_with($url, '/') && !str_starts_with($url, '//')) {
+      return;
+    }
     throw new \InvalidArgumentException('Default images for Javascript Components must be a fully-qualified URL with both scheme and host.');
   }
 
