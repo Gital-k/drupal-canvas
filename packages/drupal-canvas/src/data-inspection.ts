@@ -33,7 +33,11 @@ export function reportCanvasData(id: string, data: unknown): void {
   }
   lastReported.set(id, serialized);
   try {
-    parent.postMessage({ type: '_canvas_useswr_data_fetch', id, data });
+    // Explicit '*': called from a sandboxed, opaque-origin preview iframe,
+    // which cannot know or assert the parent's real origin. The default
+    // target origin ('/', this document's own origin) never matches the
+    // parent's, so the message would be silently dropped.
+    parent.postMessage({ type: '_canvas_useswr_data_fetch', id, data }, '*');
   } catch {
     // The embedding document may not accept messages; inspection is optional.
   }

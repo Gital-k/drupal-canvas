@@ -134,6 +134,11 @@ describe('page and site context', () => {
         </CanvasContextProvider>,
       );
     });
+    // Sent to any origin: the sandboxed code editor preview has an opaque
+    // origin, so a same-origin target would never reach the editor.
+    expect(
+      postMessage.mock.calls.every(([, targetOrigin]) => targetOrigin === '*'),
+    ).toBe(true);
     const reports = postMessage.mock.calls.map(([message]) => message);
     expect(reports).toEqual([
       {
