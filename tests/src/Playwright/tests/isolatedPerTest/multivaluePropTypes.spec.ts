@@ -201,6 +201,19 @@ test.describe('Multivalue Prop Types', () => {
     // fail due to a legitimate bug: https://drupal.org/i/3587472
     await textField.getByRole('button', { name: '+ Add new' }).click();
     await expect(textField.locator('tr.draggable')).toHaveCount(2);
+
+    // Bug #3587472
+    await expect(
+      textField
+        .locator('tr.draggable [data-canvas-multivalue-label="true"]')
+        .nth(1),
+    ).not.toContainText('Sample Text');
+    await expect(
+      textField
+        .locator('tr.draggable [data-canvas-multivalue-label="true"]')
+        .nth(1),
+    ).toHaveText('Empty');
+
     await canvas.editMultiValueProp(
       'Text (Unlimited)',
       'Hello, world!',
