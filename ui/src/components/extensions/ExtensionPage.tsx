@@ -92,7 +92,7 @@ const ExtensionPage: React.FC = () => {
         key={extensionId}
         ref={iframeRef}
         // @todo Only add 'allow-same-origin' if the extension is loaded from a local file.
-        sandbox="allow-scripts allow-same-origin allow-downloads"
+        sandbox="allow-scripts allow-same-origin allow-downloads allow-forms"
         id={`canvas-extension-page-${ext.id}`}
         src={iframeSrc}
         className={styles.iframe}
