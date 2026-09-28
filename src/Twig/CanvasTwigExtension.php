@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace Drupal\canvas\Twig;
 
+// cspell:ignore WHATWG
 use Drupal\canvas\Entity\ParametrizedImageStyle;
 use Drupal\canvas\Plugin\Field\FieldTypeOverride\ImageItemOverride;
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\Component\Render\MarkupInterface;
 use Drupal\Component\Serialization\Json;
-use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\File\FileUrlGeneratorInterface;
 use Drupal\Core\Image\ImageFactory;
 use Drupal\Core\Render\Markup;
@@ -25,7 +25,7 @@ use Twig\TwigFunction;
  *
  * This:
  * 1. adds metadata to output as HTML comments
- * 2. provides a `toSrcSet` Twig filter
+ * 2. provides a `toSrcSet` Twig filter.
  */
 final class CanvasTwigExtension extends AbstractExtension {
 
@@ -115,27 +115,41 @@ final class CanvasTwigExtension extends AbstractExtension {
       if (!empty($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM])) {
         // We only expect 1 `alternateWidths` query parameter.
         \assert(\is_string($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]));
-        $template = urldecode($params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
+        // Note: parse_str() already decodes query parameters. Keep spaces
+        // encoded as %20 for WHATWG HTML §4.8.4.3.7 compliance.
+        $template = str_replace(' ', '%20', $params[ImageItemOverride::ALT_WIDTHS_QUERY_PARAM]);
       }
     }
-    // Stream wrappers.
-    elseif ($this->streamWrapperManager->isValidUri($src)) {
-      $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($src);
-      if (\is_string($template)) {
-        $template = $this->fileUrlGenerator->transformRelative($template);
-      }
-      // Respect the specified width, if any, but ensure that it's never bigger
-      // than the actual image width.
-      $actual_intrinsic_image_width = $this->getWidth($src);
-      $intrinsicImageWidth = $intrinsicImageWidth === NULL
-        ? $actual_intrinsic_image_width
-        : min($intrinsicImageWidth, $actual_intrinsic_image_width);
-      if (\is_null($intrinsicImageWidth)) {
-        $intrinsicImageWidth = $this->getWidth($src);
+    // Stream wrappers or relative public file paths.
+    if ($template === NULL) {
+      $resolved_path = $this->resolvePath($src);
+      if ($resolved_path !== NULL && $this->streamWrapperManager->isValidUri($resolved_path)) {
+        $clean_uri = strtok($resolved_path, '?#');
+        $uri = $clean_uri !== FALSE ? rawurldecode($clean_uri) : rawurldecode($resolved_path);
+        $template = ParametrizedImageStyle::load('canvas_parametrized_width')?->buildUrlTemplate($uri);
+        if (\is_string($template)) {
+          $template = $this->fileUrlGenerator->transformRelative($template);
+          $template = str_replace(' ', '%20', $template);
+        }
+        // Respect the specified width, if any, but ensure that it's never
+        // bigger than the actual image width.
+        $actual_intrinsic_image_width = $this->getWidth($src);
+        $intrinsicImageWidth = $intrinsicImageWidth === NULL
+          ? $actual_intrinsic_image_width
+          : min($intrinsicImageWidth, $actual_intrinsic_image_width);
       }
     }
 
-    if (empty($template) || empty($intrinsicImageWidth)) {
+    if (empty($template)) {
+      return NULL;
+    }
+
+    // If no width was provided, inspect the image to determine actual width.
+    if ($intrinsicImageWidth === NULL) {
+      $intrinsicImageWidth = $this->getWidth($src);
+    }
+
+    if (empty($intrinsicImageWidth)) {
       return NULL;
     }
 
@@ -168,8 +182,9 @@ final class CanvasTwigExtension extends AbstractExtension {
    *   or the image cannot be processed.
    */
   public function getWidth(string $src): ?int {
-    if (UrlHelper::isValid($src) || $this->streamWrapperManager->isValidUri($src)) {
-      $image = $this->imageFactory->get(ltrim($src, "/"));
+    $path = $this->resolvePath($src);
+    if ($path !== NULL) {
+      $image = $this->imageFactory->get($path);
       if ($image->isValid()) {
         return $image->getWidth();
       }
@@ -188,13 +203,45 @@ final class CanvasTwigExtension extends AbstractExtension {
    *   or the image cannot be processed.
    */
   public function getHeight(string $src): ?int {
-    if (UrlHelper::isValid($src) || $this->streamWrapperManager->isValidUri($src)) {
-      $image = $this->imageFactory->get(ltrim($src, "/"));
+    $path = $this->resolvePath($src);
+    if ($path !== NULL) {
+      $image = $this->imageFactory->get($path);
       if ($image->isValid()) {
         return $image->getHeight();
       }
     }
     return NULL;
+  }
+
+  /**
+   * Resolves an image source URL, path, or URI to a file path or stream URI.
+   *
+   * @param string $src
+   *   The image source path, URL, or stream wrapper URI.
+   *
+   * @return string|null
+   *   The resolved file path or stream wrapper URI, or NULL if invalid.
+   */
+  private function resolvePath(string $src): ?string {
+    if ($this->streamWrapperManager->isValidUri($src)) {
+      $uri = strtok($src, '?#');
+      return $uri !== FALSE ? rawurldecode($uri) : rawurldecode($src);
+    }
+    $path = parse_url($src, PHP_URL_PATH);
+    if (!\is_string($path) || $path === '') {
+      return NULL;
+    }
+    $decoded = rawurldecode(ltrim($path, '/'));
+    $public_wrapper = $this->streamWrapperManager->getViaScheme('public');
+    $public_path = \is_object($public_wrapper) && method_exists($public_wrapper, 'getDirectoryPath')
+      ? $public_wrapper->getDirectoryPath()
+      : 'sites/default/files';
+    foreach (array_unique([$public_path, 'sites/default/files']) as $prefix) {
+      if ($prefix !== '' && str_starts_with($decoded, $prefix . '/')) {
+        return 'public://' . substr($decoded, \strlen($prefix) + 1);
+      }
+    }
+    return $decoded;
   }
 
   /**

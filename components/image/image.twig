@@ -10,7 +10,7 @@
      srcset="{{ srcset }}"
      sizes="{{ sizes ?? 'auto 100vw' }}"
    {% endif %}
-   {% if alt %}
+   {% if alt is defined and alt is not null %}
      alt="{{ alt }}"
    {% endif %}
    {% if width %}

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Drupal\Tests\canvas\Unit\Twig;
 
 // cspell:ignore fitok itok Bwidth
-
 use Drupal\canvas\Routing\ParametrizedImageStyleConverter;
 use Drupal\canvas\Twig\CanvasTwigExtension;
 use Drupal\Core\File\FileUrlGeneratorInterface;
@@ -25,6 +24,8 @@ use PHPUnit\Framework\Attributes\Group;
 class CanvasTwigExtensionFiltersTest extends UnitTestCase {
 
   /**
+   * The Canvas Twig extension.
+   *
    * @var \Drupal\canvas\Twig\CanvasTwigExtension
    */
   private CanvasTwigExtension $canvasTwigExtension;
@@ -41,7 +42,7 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     $fileUrlInterfaceManager = $this->createMock(FileUrlGeneratorInterface::class);
     $renderer = $this->createMock(RendererInterface::class);
 
-    // Create the extension instance
+    // Create the extension instance.
     $this->canvasTwigExtension = new CanvasTwigExtension($streamWrapperManager, $imageFactory, $fileUrlInterfaceManager, $renderer);
   }
 
@@ -126,9 +127,18 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     // @phpcs:enable
   }
 
+  /**
+   * Generates expected srcset string for given widths.
+   *
+   * @param int[] $widths
+   *   The widths to generate srcset for.
+   *
+   * @return string
+   *   The expected srcset string.
+   */
   private static function generateExpectedSrcSetForWidths(array $widths): string {
     return implode(', ', \array_map(function ($width) {
-      return "/sites/default/files/styles/canvas_parametrized_width--$width/public/2025-07/Screenshot 2025-07-08 at 8.56.02.png.webp?itok=Wp4lG4Wk {$width}w";
+      return "/sites/default/files/styles/canvas_parametrized_width--$width/public/2025-07/Screenshot%202025-07-08%20at%208.56.02.png.webp?itok=Wp4lG4Wk {$width}w";
     }, $widths));
   }
 
@@ -148,6 +158,12 @@ class CanvasTwigExtensionFiltersTest extends UnitTestCase {
     $this->canvasTwigExtension->toSrcSet($src, $intrinsicImageWidth);
   }
 
+  /**
+   * Data provider for testToSrcSetWithInvalidWidth.
+   *
+   * @return \Generator
+   *   The test data generator.
+   */
   public static function invalidProviderToSrcSet(): \Generator {
     yield 'simple image with wrongly formatted alternateWidths query' => [
       '/simple-image.png?alternateWidths=something',
