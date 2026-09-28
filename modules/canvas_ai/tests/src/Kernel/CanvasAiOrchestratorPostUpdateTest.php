@@ -76,7 +76,7 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
   public static function providerPromptReimport(): array {
     return [
       '0003' => ['canvas_ai_post_update_0003_reimport_orchestrator_agent'],
-      '0012' => ['canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome'],
+      '0014' => ['canvas_ai_post_update_0014_reimport_orchestrator_content_only_chrome'],
     ];
   }
 

@@ -399,9 +399,13 @@ function canvas_ai_post_update_0013_delete_page_variant_settings(): void {
  * from 0011, which re-imports every agent's system prompt; writing it again
  * here is harmless. Sites that ran 0011 before the prompt changed get it here.
  *
+ * Updates 0012 and 0013 rewrite the page and template builder prompts and
+ * drop the page variant settings; neither touches the orchestrator, so this
+ * update only has to write the orchestrator prompt again.
+ *
  * @see https://git.drupalcode.org/project/canvas/-/work_items/3592060
  */
-function canvas_ai_post_update_0012_reimport_orchestrator_content_only_chrome(): void {
+function canvas_ai_post_update_0014_reimport_orchestrator_content_only_chrome(): void {
   $module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas_ai');
   $source = new FileStorage($module_path . '/config/install');
   $data = $source->read('ai_agents.ai_agent.canvas_ai_orchestrator');
