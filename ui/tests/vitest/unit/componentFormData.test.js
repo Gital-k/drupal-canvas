@@ -1,8 +1,8 @@
-import { getPropsValues } from '@/components/form/react-hook-form/fields/componentFormData';
 import {
   shouldSkipPropValidation,
   validateNewValue,
 } from '@/components/form/react-hook-form/fields/componentFieldValidation';
+import { getPropsValues } from '@/components/form/react-hook-form/fields/componentFormData';
 
 describe('componentFieldValidation - required multivalue prop validation', () => {
   const selectedComponent = 'test-uuid';
