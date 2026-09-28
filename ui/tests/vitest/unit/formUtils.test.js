@@ -758,6 +758,59 @@ describe('shouldSkipPropValidation', () => {
       shouldSkipPropValidation(target.name, target, inputAndUiData, '7'),
     ).to.equal(true);
   });
+
+  it('does not skip validation for the "_none" sentinel on a required select', () => {
+    // A required select must still be validated when "_none" is chosen, so
+    // the user is prompted to pick a real option.
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][size][0][value]',
+      [],
+      'select',
+    );
+    target.required = true;
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.article',
+      components: {
+        'js.article': {
+          propSources: {
+            size: {
+              jsonSchema: { type: 'string', enum: ['small', 'large'] },
+            },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, '_none'),
+    ).to.equal(false);
+  });
+
+  it('does not skip validation for the "_none" sentinel on a non-select element', () => {
+    // The _none skip only applies to SELECT/OPTION elements; a text input
+    // that happens to have the literal value "_none" should still be
+    // validated normally.
+    const target = buildTargetInForm(
+      'canvas_component_props[comp1][size][0][value]',
+    );
+    target.required = false;
+    const inputAndUiData = {
+      selectedComponent: 'comp1',
+      selectedComponentType: 'js.article',
+      components: {
+        'js.article': {
+          propSources: {
+            size: {
+              jsonSchema: { type: 'string', enum: ['small', 'large'] },
+            },
+          },
+        },
+      },
+    };
+    expect(
+      shouldSkipPropValidation(target.name, target, inputAndUiData, '_none'),
+    ).to.equal(false);
+  });
 });
 
 describe('propInputData', () => {
