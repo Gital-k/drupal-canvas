@@ -29,6 +29,7 @@ import {
   EditorFrameContext,
   selectEditorFrameContext,
   selectPreviouslyEdited,
+  setRightPanelOpen,
 } from '@/features/ui/uiSlice';
 import useEditorNavigation from '@/hooks/useEditorNavigation';
 import { useEntityTitle } from '@/hooks/useEntityTitle';
@@ -161,6 +162,7 @@ const PageInfo = () => {
   }, [dispatch, homepageConfig, isGetStagedUpdateSuccess]);
 
   function handleNewPage() {
+    dispatch(setRightPanelOpen(true));
     createContent({
       entity_type: 'canvas_page',
     });
