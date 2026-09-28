@@ -1,0 +1,8 @@
+name: 'Canvas Tour'
+type: module
+description: 'Bridges core Tour module tours onto the Canvas editor.'
+package: Canvas
+core_version_requirement: ^11.3 || ^12
+dependencies:
+  - drupal:canvas
+  - drupal:tour

@@ -1,0 +1,5 @@
+services:
+  _defaults:
+    autoconfigure: true
+    autowire: true
+  Drupal\canvas_tour\EventSubscriber\TourSubscriber: ~

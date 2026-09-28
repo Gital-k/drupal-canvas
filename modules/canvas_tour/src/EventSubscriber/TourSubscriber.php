@@ -2,11 +2,10 @@
 
 declare(strict_types=1);
 
-namespace Drupal\canvas\EventSubscriber;
+namespace Drupal\canvas_tour\EventSubscriber;
 
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Session\AccountInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -36,18 +35,27 @@ use Symfony\Component\HttpKernel\KernelEvents;
  * versus HtmlResponseSubscriber's default priority 0 and
  * \Drupal\Core\EventSubscriber\HtmlResponsePlaceholderStrategySubscriber's
  * priority 5) to merge in Tour's own attachments before those core
- * subscribers bake attachments into the response body.
+ * subscribers bake attachments into the response body. This requires
+ * #3592107 (a `scripts_bottom` placeholder in CanvasController::HTML) so
+ * that footer-scope JS libraries (Tour's own `tour/tour` included) actually
+ * reach the page instead of being silently dropped.
+ *
+ * Core's own Tour trigger is rendered by the Toolbar module, which Canvas's
+ * editor shell never builds. `js/canvas-tour-bridge.js` inserts an
+ * equivalent trigger into the Canvas topbar and calls `Drupal.tour.setActive()`
+ * — core Tour's own public toggle — so the tour this subscriber attaches is
+ * actually reachable.
  *
  * @see \Drupal\canvas\Controller\CanvasController::__invoke()
  * @see \Drupal\canvas\PathProcessor\CanvasPathProcessor
  * @see \Drupal\Core\EventSubscriber\HtmlResponseSubscriber
  * @see \Drupal\tour\Hook\TourHooks::pageBottom()
+ * @see js/canvas-tour-bridge.js
  */
 final class TourSubscriber implements EventSubscriberInterface {
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
-    private readonly ModuleHandlerInterface $moduleHandler,
     private readonly AccountInterface $currentUser,
   ) {}
 
@@ -69,10 +77,6 @@ final class TourSubscriber implements EventSubscriberInterface {
     }
 
     if ($event->getRequest()->attributes->get('_route') !== 'canvas.boot.empty') {
-      return;
-    }
-
-    if (!$this->moduleHandler->moduleExists('tour')) {
       return;
     }
 
@@ -109,7 +113,7 @@ final class TourSubscriber implements EventSubscriberInterface {
     $response->addCacheableDependency(CacheableMetadata::createFromRenderArray($build));
 
     $attachments = $response->getAttachments();
-    $attachments['library'] = [...$attachments['library'] ?? [], ...$build['#attached']['library']];
+    $attachments['library'] = [...$attachments['library'] ?? [], ...$build['#attached']['library'], 'canvas_tour/canvas-tour-bridge'];
     $attachments['drupalSettings'] = array_merge($attachments['drupalSettings'] ?? [], $build['#attached']['drupalSettings'] ?? []);
     $response->setAttachments($attachments);
   }
