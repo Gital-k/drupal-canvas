@@ -50,6 +50,39 @@ describe('componentFieldValidation - required multivalue prop validation', () =>
             source: { value: [] },
           },
         },
+        links: {
+          expression: '',
+          sourceType: 'static:field_item:link',
+          required: true,
+          sourceTypeSettings: {
+            instance: { title: 0 },
+          },
+          jsonSchema: {
+            type: 'array',
+            items: { type: 'string', format: 'uri-reference' },
+            minItems: 1,
+          },
+          default_values: {
+            resolved: ['/default-path'],
+            source: { value: ['/default-path'] },
+          },
+        },
+        optional_links: {
+          expression: '',
+          sourceType: 'static:field_item:link',
+          required: false,
+          sourceTypeSettings: {
+            instance: { title: 0 },
+          },
+          jsonSchema: {
+            type: 'array',
+            items: { type: 'string', format: 'uri-reference' },
+          },
+          default_values: {
+            resolved: [],
+            source: { value: [] },
+          },
+        },
       },
     },
   };
@@ -63,7 +96,7 @@ describe('componentFieldValidation - required multivalue prop validation', () =>
     editorFrameContext: 'entity',
     model: {
       [selectedComponent]: {
-        resolved: { tags: ['existing'] },
+        resolved: { tags: ['existing'], links: ['/existing'] },
         source: {},
       },
     },
@@ -107,6 +140,32 @@ describe('componentFieldValidation - required multivalue prop validation', () =>
       );
       expect(result).toBe(true);
     });
+
+    it('does not skip validation for empty value on required link array prop with minItems', () => {
+      const input = makeInput(
+        `canvas_component_props[${selectedComponent}][links][0][uri]`,
+      );
+      const result = shouldSkipPropValidation(
+        input.name,
+        input,
+        inputAndUiData,
+        '',
+      );
+      expect(result).toBe(false);
+    });
+
+    it('skips validation for empty value on optional link array prop without minItems', () => {
+      const input = makeInput(
+        `canvas_component_props[${selectedComponent}][optional_links][0][uri]`,
+      );
+      const result = shouldSkipPropValidation(
+        input.name,
+        input,
+        inputAndUiData,
+        '',
+      );
+      expect(result).toBe(true);
+    });
   });
 
   describe('validateNewValue', () => {
@@ -134,6 +193,53 @@ describe('componentFieldValidation - required multivalue prop validation', () =>
       const result = validateNewValue(
         event,
         'hello',
+        input.name,
+        selectedComponent,
+        inputAndUiData,
+      );
+      expect(result.valid).toBe(true);
+    });
+
+    it('returns invalid for empty URI on required link array prop with minItems', () => {
+      const input = makeInput(
+        `canvas_component_props[${selectedComponent}][links][0][uri]`,
+      );
+      const event = { target: input };
+      const result = validateNewValue(
+        event,
+        '',
+        input.name,
+        selectedComponent,
+        inputAndUiData,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errorMessage).toBe('This field is required.');
+    });
+
+    it('returns invalid for null URI on required link array prop with minItems', () => {
+      const input = makeInput(
+        `canvas_component_props[${selectedComponent}][links][0][uri]`,
+      );
+      const event = { target: input };
+      const result = validateNewValue(
+        event,
+        null,
+        input.name,
+        selectedComponent,
+        inputAndUiData,
+      );
+      expect(result.valid).toBe(false);
+      expect(result.errorMessage).toBe('This field is required.');
+    });
+
+    it('returns valid for non-empty URI on required link array prop with minItems', () => {
+      const input = makeInput(
+        `canvas_component_props[${selectedComponent}][links][0][uri]`,
+      );
+      const event = { target: input };
+      const result = validateNewValue(
+        event,
+        '/about-us',
         input.name,
         selectedComponent,
         inputAndUiData,
