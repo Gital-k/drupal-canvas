@@ -201,7 +201,7 @@ interface ComponentSourceInterface extends PluginInspectionInterface, Derivative
    *   those to ensure we don't have an error when rendering a component
    *   instance on a live public-facing component tree.
    *
-   * @return array<string, mixed>
+   * @return array{'slots'?: array<string, string>}
    *
    * @see \Drupal\canvas\ComponentSource\ComponentSourceWithSlotsInterface::setSlots()
    */

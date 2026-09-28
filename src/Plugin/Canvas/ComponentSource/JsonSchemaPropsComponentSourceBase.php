@@ -543,51 +543,6 @@ abstract class JsonSchemaPropsComponentSourceBase extends ComponentSourceBase im
       if (!$is_required && $prop_expression instanceof ObjectPropExpressionInterface && empty(array_filter($resolved_value->value))) {
         unset($hydrated[self::EXPLICIT_INPUT_NAME][$prop]);
       }
-      // Required `type: array` props that would fail SDC schema
-      // validation and cause an InvalidComponentException during rendering,
-      // either because the value is an empty array (violates `minItems: 1`
-      // after the Content Author removes all items mid-edit) or because the
-      // items are objects where scalars are expected (e.g. a `link` field
-      // leaking its raw `{uri, options}` structure instead of a URL string).
-      // Fall back to a valid value so the component still renders
-      // while editing.
-      if ($is_required && \is_array($resolved_value->value) && \array_key_exists($prop, $active_required_explicit_inputs)) {
-        $needs_fallback = $resolved_value->value === [];
-        if (!$needs_fallback && !empty($resolved_value->value)) {
-          $first_item = $resolved_value->value[array_key_first($resolved_value->value)];
-          if (\is_array($first_item) || (\is_object($first_item) && !$first_item instanceof \Stringable)) {
-            $needs_fallback = TRUE;
-          }
-        }
-        if ($needs_fallback) {
-          // Evaluate the default StaticPropSource rather than using its raw
-          // stored `value`: for some field types the stored (field-shaped)
-          // representation differs from the resolved (schema-shaped) one (e.g.
-          // a `link` field stores `{uri, options}` but the schema expects a
-          // URL string).
-          $resolved_default = NULL;
-          try {
-            $resolved_default = PropSource::parse($active_required_explicit_inputs[$prop])
-              ->evaluate(NULL, is_required: FALSE)
-              ->value;
-          }
-          catch (\Throwable) {
-            // Ignore: fall back to the component metadata example below.
-          }
-          if ($resolved_default !== NULL && $resolved_default !== []) {
-            $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult($resolved_default);
-          }
-          else {
-            $examples = $this->getMetadata()->schema['properties'][$prop]['examples'] ?? [];
-            if (\array_key_exists(0, $examples)) {
-              // Entity-requiring props (e.g. `format: uri-reference` links,
-              // images) resolve to []: their example cannot be stored in the
-              // field type, so fall back to the component metadata example.
-              $hydrated[self::EXPLICIT_INPUT_NAME][$prop] = new EvaluationResult($examples[0]);
-            }
-          }
-        }
-      }
     }
     // The live implementation may have new required props; automatically
     // populate those using their default values.
