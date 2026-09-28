@@ -220,6 +220,34 @@ final class CanvasControllerTest extends CanvasKernelTestBase {
     self::assertSame('http://localhost', $this->drupalSettings['canvas']['siteUrl']);
   }
 
+  /**
+   * Tests that footer-scope JS reaches the Canvas editor shell.
+   *
+   * `CanvasController::HTML` returns an `HtmlResponse` directly instead of a
+   * render array, so `HtmlResponseAttachmentsProcessor::processAssetLibraries()`
+   * needs a `scripts_bottom` placeholder token to insert footer-scope JS
+   * into, the same way `html.html.twig` provides one on every other page.
+   * `canvas/canvas-ui` depends on `canvas/ajax.custom`, which does not
+   * declare `header: true` and therefore defaults to the footer scope, so
+   * its JS is a real, always-attached asset this route already ships.
+   *
+   * @see \Drupal\canvas\Controller\CanvasController::HTML
+   */
+  public function testFooterScopeJsReachesEditorShell(): void {
+    $this->installEntitySchema(Page::ENTITY_TYPE_ID);
+    $this->setUpCurrentUser([], ['access content', Page::CREATE_PERMISSION, Page::EDIT_PERMISSION]);
+
+    $canvas_url = Url::fromRoute('canvas.boot.empty', [
+      'entity_type' => '',
+      'entity' => '',
+    ])->toString();
+
+    /** @var \Drupal\Core\Render\HtmlResponse $response */
+    $response = $this->request(Request::create($canvas_url));
+
+    self::assertStringContainsString('ajax.command.customizations.js', (string) $response->getContent());
+  }
+
   public static function permissionsData(): array {
     // @see \Drupal\canvas\Entity\PageAccessControlHandler
     $page_permissions = [
