@@ -219,33 +219,35 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that a boolean prop given "true"/"false" as a string is coerced.
+   * Tests that an invalid boolean or integer prop value is rejected.
    *
-   * That is the only value shape a model writes for a boolean prop that is
-   * unambiguous enough to fix silently; it must validate and be stored as a
-   * real boolean rather than failing the whole placement.
+   * `BooleanData::getCastedValue()` casts any non-empty string to `TRUE`,
+   * and `IntegerData::getCastedValue()` casts any non-numeric string to `0`,
+   * so silently letting an unrecognized value like `"maybe"` or `"canvas"`
+   * through would store the wrong value with no error anywhere.
    *
-   * @see \Drupal\canvas_ai\AiResponseValidator::normalizeBooleanProps()
+   * @see \Drupal\canvas_ai\AiResponseValidator::collectPrimitiveTypeViolations()
    */
-  public function testTypedValuesAreNormalizedBeforeValidation(): void {
+  public function testInvalidPrimitiveTypeValueReportsError(): void {
     $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
     $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_empty'));
 
-    $tool = $this->functionCallManager->createInstance('canvas_ai:place_components');
-    $this->assertInstanceOf(PlaceComponents::class, $tool);
-    $tool->setContextValue('operations', [
+    $result = $this->getComponentToolOutput([
       self::buildOperation(<<<YAML
         - sdc.canvas_test_sdc.shoe_badge:
             props:
               variant: "primary"
-              pill: "False"
+              pill: "maybe"
+        - sdc.canvas_test_sdc.required-integer:
+            props:
+              count: "canvas"
         YAML),
     ]);
-    $tool->execute();
 
-    self::assertStringStartsWith('Components placed successfully.', $tool->getReadableOutput());
-    $placed = $tool->getStructuredOutput()['operations'][0]['components'];
-    self::assertSame(['variant' => 'primary', 'pill' => FALSE], $placed[0]['fieldValues']);
+    $normalized = self::normalizeErrorString($result);
+    $this->assertStringStartsWith('Failed to place components: Component validation errors:', $normalized);
+    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.shoe_badge].props.pill: Component `sdc.canvas_test_sdc.shoe_badge`: the `pill` prop value "maybe" cannot be stored: expected a boolean (`true` or `false`).', $normalized);
+    $this->assertStringContainsString('components.1.[sdc.canvas_test_sdc.required-integer].props.count: Component `sdc.canvas_test_sdc.required-integer`: the `count` prop value "canvas" cannot be stored: expected an integer.', $normalized);
   }
 
   /**

@@ -143,7 +143,7 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
         $component_updates[$uuid] = $props;
       }
 
-      $component_updates = $this->validateComponentUpdates($component_updates);
+      $this->validateComponentUpdates($component_updates);
 
       // The frontend applies these updates to the page on the next hop.
       $this->setStructuredOutput(['component_updates' => $component_updates]);
@@ -168,16 +168,12 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
    * @param array $component_updates
    *   The parsed updates, keyed by component UUID with prop_name => value pairs.
    *
-   * @return array
-   *   The updates with every prop value normalized against its schema, so the
-   *   client applies exactly what was validated.
-   *
    * @throws \Exception
    *   When an edited UUID is not present on the page.
    * @throws \Drupal\canvas\Exception\ConstraintViolationException
    *   When the merged prop values fail validation.
    */
-  private function validateComponentUpdates(array $component_updates): array {
+  private function validateComponentUpdates(array $component_updates): void {
     $current_layout = Json::decode($this->canvasAiTempStore->getData(CanvasAiTempStore::CURRENT_LAYOUT_KEY) ?? '');
     $current_layout = \is_array($current_layout) ? $current_layout : [];
     $components_by_uuid = $this->pageBuilderHelper->getComponentsByUuid($current_layout);
@@ -193,24 +189,14 @@ final class EditComponents extends FunctionCallBase implements ExecutableFunctio
       // Merge over existing props so validation does not treat a partial edit
       // as dropping the component's other required props.
       $merged_props = (\is_array($prop_updates) ? $prop_updates : []) + $component['props'];
-      $component_groups[$uuid] = [$component['component_id'] => ['props' => $merged_props]];
+      $component_groups[] = [$component['component_id'] => ['props' => $merged_props]];
     }
 
     if ($errors !== []) {
       throw new \Exception(implode("\n", $errors));
     }
 
-    $normalized_groups = $this->responseValidator->validateComponentStructure(array_values($component_groups));
-    // Hand back only the props each edit changed, in their normalized form.
-    $normalized_updates = [];
-    foreach (\array_keys($component_groups) as $index => $uuid) {
-      $normalized_props = reset($normalized_groups[$index])['props'] ?? [];
-      $normalized_updates[$uuid] = \array_intersect_key(
-        $normalized_props,
-        \is_array($component_updates[$uuid]) ? $component_updates[$uuid] : []
-      );
-    }
-    return $normalized_updates;
+    $this->responseValidator->validateComponentStructure($component_groups);
   }
 
 }

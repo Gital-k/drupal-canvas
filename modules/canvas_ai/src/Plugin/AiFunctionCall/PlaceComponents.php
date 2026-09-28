@@ -137,9 +137,7 @@ final class PlaceComponents extends FunctionCallBase implements ExecutableFuncti
         }
         $all_errors = array_merge($all_errors, $this->validatePlacementParams($operation, $index, $current_layout));
         if (\is_array($operation['components'])) {
-          // Validation returns the structure with prop values normalized, so
-          // the placement stores exactly what was validated.
-          $operation['components'] = $this->responseValidator->validateComponentStructure($operation['components']);
+          $this->responseValidator->validateComponentStructure($operation['components']);
         }
         $operations[] = $operation;
       }

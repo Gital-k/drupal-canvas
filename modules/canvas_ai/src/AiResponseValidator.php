@@ -8,6 +8,8 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Uuid\UuidInterface;
+use Drupal\Core\TypedData\DataDefinition;
+use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -27,38 +29,38 @@ class AiResponseValidator {
    *   The validator factory.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
+   * @param \Drupal\Core\TypedData\TypedDataManagerInterface $typedDataManager
+   *   The typed data manager.
    */
   public function __construct(
     protected readonly BasicRecursiveValidatorFactory $validatorFactory,
     protected readonly UuidInterface $uuidService,
+    TypedDataManagerInterface $typedDataManager,
   ) {
+    // ComponentTreeItemListInstantiatorTrait already declares the
+    // $typedDataManager property via core's TypedDataTrait, so it is set
+    // rather than promoted as a second constructor property of the same
+    // name.
+    $this->setTypedDataManager($typedDataManager);
   }
 
   /**
    * Validates the component structure.
    *
-   * A boolean prop given the string "true"/"false" is coerced to a real
-   * boolean before validation; that is the only value shape worth silently
-   * fixing. Callers that store or forward the props must use the return
-   * value, not their input, so what was validated is what gets placed.
-   *
    * @param array $componentGroups
    *   The component groups to validate.
-   *
-   * @return array
-   *   The component groups, with recognized boolean strings coerced.
    *
    * @throws \Drupal\canvas\Exception\ConstraintViolationException
    *   When validation fails.
    */
-  public function validateComponentStructure(array $componentGroups): array {
+  public function validateComponentStructure(array $componentGroups): void {
     // Create a mapping of components to their original paths.
     $pathMapping = [];
     // Some violations are found outside of ComponentTreeItemList->validate():
-    // props that do not exist on their component, boolean props given a
-    // value that cannot be confidently interpreted, and values the component
-    // source dropped rather than stored. Collect them during conversion
-    // instead.
+    // props that do not exist on their component, primitive-typed props
+    // given a value core's own type validation would reject, and values the
+    // component source dropped rather than stored. Collect them during
+    // conversion instead.
     $outOfBandViolations = new ConstraintViolationList();
 
     // Convert YAML structure to Canvas ComponentTreeItem format.
@@ -81,14 +83,13 @@ class AiResponseValidator {
         'Component validation errors'
       );
     }
-    return $componentGroups;
   }
 
   /**
    * Converts component groups to component tree data.
    *
    * @param array $componentGroups
-   *   The component groups to convert. Prop values are normalized in place.
+   *   The component groups to convert.
    * @param string|null $parentUuid
    *   The parent UUID, if any.
    * @param string|null $slotName
@@ -104,7 +105,7 @@ class AiResponseValidator {
    *   The converted component tree data.
    */
   private function convertToComponentTreeData(
-    array &$componentGroups,
+    array $componentGroups,
     ?string $parentUuid,
     ?string $slotName,
     string $pathPrefix,
@@ -112,11 +113,11 @@ class AiResponseValidator {
     ConstraintViolationList $outOfBandViolations,
   ): array {
     $componentTreeData = [];
-    foreach ($componentGroups as $groupIndex => &$componentGroup) {
+    foreach ($componentGroups as $groupIndex => $componentGroup) {
       if (!\is_array($componentGroup)) {
         continue;
       }
-      foreach ($componentGroup as $componentId => &$componentData) {
+      foreach ($componentGroup as $componentId => $componentData) {
         $componentUuid = $this->uuidService->generate();
 
         $componentPath = \sprintf('%s.%d.[%s]', $pathPrefix, $groupIndex, $componentId);
@@ -139,9 +140,10 @@ class AiResponseValidator {
             $outOfBandViolations
           );
           if (\is_array($componentData['props'])) {
-            $componentData['props'] = $this->normalizeBooleanProps(
+            $this->collectPrimitiveTypeViolations(
+              $componentId,
               $componentData['props'],
-              $propSources, $componentId,
+              $propSources,
               $componentPath,
               $outOfBandViolations
             );
@@ -174,7 +176,7 @@ class AiResponseValidator {
 
         // Process slots recursively.
         if (isset($componentData['slots']) && \is_array($componentData['slots'])) {
-          foreach ($componentData['slots'] as $slot => &$slotComponentGroups) {
+          foreach ($componentData['slots'] as $slot => $slotComponentGroups) {
             if (!\is_array($slotComponentGroups)) {
               continue;
             }
@@ -191,12 +193,9 @@ class AiResponseValidator {
               )
             );
           }
-          unset($slotComponentGroups);
         }
       }
-      unset($componentData);
     }
-    unset($componentGroup);
     return $componentTreeData;
   }
 
@@ -251,55 +250,57 @@ class AiResponseValidator {
   }
 
   /**
-   * Coerces "true"/"false" strings on boolean props to real booleans.
+   * Collects violations for primitive-typed prop values core would reject.
    *
-   * A client may write the strings "true"/"false" instead of a YAML/JSON
-   * boolean literal; that is the only value shape unambiguous enough to fix
-   * silently. Anything else on a boolean prop is reported instead of being
-   * passed through: `Evaluator::doEvaluate()` casts any non-empty string to
-   * `TRUE`, which would silently store the wrong value with no error at all.
+   * Reuses core's own primitive-type validation, the same check
+   * `PrimitiveTypeConstraintValidator` performs on a real field, via the
+   * typed data manager, rather than hand-rolled string comparisons. A value
+   * that fails is reported instead of being passed through:
+   * `Evaluator::doEvaluate()` casts any non-empty string to `TRUE` for a
+   * boolean prop, and `Evaluator::getCastedValue()` casts any string to
+   * `0`/`0.0` for an integer or number prop, so an unchecked bad value would
+   * silently store the wrong thing with no error at all.
    *
+   * @param string $componentId
+   *   The component ID, used in violation messages.
    * @param array $props
    *   The AI-supplied props.
    * @param array|null $propSources
    *   The component's defined prop sources, or NULL for sources that are not
    *   prop-based (e.g. block components).
-   * @param string $componentId
-   *   The component ID, used in violation messages.
    * @param string $componentPath
    *   The component path, used to build the violation property path.
    * @param \Symfony\Component\Validator\ConstraintViolationList $violations
-   *   The list to add a violation to when a value cannot be interpreted.
+   *   The list to add a violation to when a value fails.
    *
-   * @return array
-   *   The props, with recognized boolean strings coerced to real booleans.
-   *
+   * @see \Drupal\Core\Validation\Plugin\Validation\Constraint\PrimitiveTypeConstraintValidator
    * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
+   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::getCastedValue()
    */
-  private function normalizeBooleanProps(array $props, ?array $propSources, string $componentId, string $componentPath, ConstraintViolationList $violations): array {
+  private function collectPrimitiveTypeViolations(string $componentId, array $props, ?array $propSources, string $componentPath, ConstraintViolationList $violations): void {
     if ($propSources === NULL) {
-      return $props;
+      return;
     }
-    foreach ($props as $propName => $propValue) {
-      $isBooleanProp = ($propSources[$propName]['jsonSchema']['type'] ?? NULL) === 'boolean';
-      if (!$isBooleanProp || \is_bool($propValue) || $propValue === NULL) {
+    foreach (\array_intersect_key($props, $propSources) as $propName => $propValue) {
+      [$dataType, $expectation] = match ($propSources[$propName]['jsonSchema']['type'] ?? NULL) {
+        'boolean' => ['boolean', 'expected a boolean (`true` or `false`)'],
+        'integer' => ['integer', 'expected an integer'],
+        'number' => ['float', 'expected a number'],
+        default => [NULL, NULL],
+      };
+      if ($propValue === NULL || $dataType === NULL) {
         continue;
       }
-      if (\is_string($propValue)) {
-        $word = \strtolower($propValue);
-        if ($word === 'true' || $word === 'false') {
-          $props[$propName] = $word === 'true';
-          continue;
-        }
+      if ($this->getTypedDataManager()->create(DataDefinition::create($dataType), $propValue)->validate()->count() === 0) {
+        continue;
       }
       $this->addGarbageInputViolation(
         $violations,
-        \sprintf('Component `%s`: the `%s` prop value %s cannot be stored: expected a boolean (`true` or `false`).', $componentId, $propName, \json_encode($propValue)),
+        \sprintf('Component `%s`: the `%s` prop value %s cannot be stored: %s.', $componentId, $propName, \json_encode($propValue), $expectation),
         \sprintf('%s.props.%s', $componentPath, $propName),
         $propValue,
       );
     }
-    return $props;
   }
 
   /**
