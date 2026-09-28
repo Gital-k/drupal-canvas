@@ -165,6 +165,88 @@ describe('StableHeightReader', () => {
     expect(harness.getViewportHeight()).toBe(500);
   });
 
+  describe('candidates a probe rules out', () => {
+    function stabilizeFixedSection(reader: StableHeightReader) {
+      const probedHeights: number[] = [];
+      let viewportHeight = 500;
+      vi.spyOn(window, 'innerHeight', 'get').mockImplementation(
+        () => viewportHeight,
+      );
+      const run = () =>
+        reader.stabilize({
+          roots: [document.documentElement],
+          effectiveViewportHeight: 500,
+          baseViewportHeight: 500,
+          probeMultipliers: [3, 8],
+          probeController: {
+            setViewportHeight: (height) => {
+              probedHeights.push(height);
+              viewportHeight = height;
+            },
+            restoreViewportHeight: () => {
+              viewportHeight = 500;
+            },
+          },
+        });
+      return { run, probedHeights };
+    }
+
+    function appendFixedSection(clientHeight = 900): HTMLElement {
+      const section = document.createElement('section');
+      section.style.height = '900px';
+      document.body.appendChild(section);
+      Object.defineProperty(section, 'clientHeight', {
+        configurable: true,
+        get: () => clientHeight,
+      });
+      return section;
+    }
+
+    it('does not probe a ruled-out candidate again', async () => {
+      appendFixedSection();
+      const { run, probedHeights } = stabilizeFixedSection(
+        new StableHeightReader(),
+      );
+
+      expect((await run()).didProbe).toBe(true);
+      // Every probe resizes the preview, and an app reacting to that resize
+      // triggers the next measurement: probing again would never settle.
+      expect((await run()).didProbe).toBe(false);
+      expect(probedHeights).toEqual([1500, 4000]);
+    });
+
+    it('probes a ruled-out candidate again once it changes', async () => {
+      const section = appendFixedSection();
+      const { run } = stabilizeFixedSection(new StableHeightReader());
+
+      await run();
+      section.classList.add('now-viewport-relative');
+
+      expect((await run()).didProbe).toBe(true);
+    });
+
+    it('probes a ruled-out candidate again after the reader clears', async () => {
+      appendFixedSection();
+      const reader = new StableHeightReader();
+      const { run } = stabilizeFixedSection(reader);
+
+      await run();
+      reader.clear();
+
+      expect((await run()).didProbe).toBe(true);
+    });
+
+    it('keeps probing a candidate too small to measure', async () => {
+      // Hidden during the probe, so it was never measured, only skipped.
+      appendFixedSection(0);
+      const { run } = stabilizeFixedSection(new StableHeightReader());
+
+      await run();
+
+      expect((await run()).didProbe).toBe(true);
+    });
+  });
+
   it('pins viewport min-height without clipping taller content', async () => {
     const section = document.createElement('section');
     section.style.minHeight = '150vh';

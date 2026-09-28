@@ -195,12 +195,14 @@ export class StableHeightReader {
   #elementCache = new WeakMap<HTMLElement, VhSignatureCacheEntry>();
   readonly #signatureCache = new Map<string, VhSignatureCacheEntry>();
   readonly #pinSnapshots = new Map<HTMLElement, StyleSnapshot>();
+  #rejectedCandidates = new WeakMap<HTMLElement, string>();
 
   clear(): void {
     restore([...this.#pinSnapshots.values()]);
     this.#elementCache = new WeakMap<HTMLElement, VhSignatureCacheEntry>();
     this.#signatureCache.clear();
     this.#pinSnapshots.clear();
+    this.#rejectedCandidates = new WeakMap<HTMLElement, string>();
   }
 
   #getCachedEntry(element: HTMLElement): VhSignatureCacheEntry | undefined {
@@ -228,6 +230,12 @@ export class StableHeightReader {
       if (cached) {
         applyStableHeight(element, cached);
         pinnedElements.add(element);
+        continue;
+      }
+
+      // Already ruled out, and unchanged since: probing again would give the
+      // same answer.
+      if (this.#rejectedCandidates.get(element) === signature) {
         continue;
       }
 
@@ -322,12 +330,15 @@ export class StableHeightReader {
 
     for (const candidate of candidates) {
       const heights = inferredHeights.get(candidate.element) ?? [];
-      if (
-        heights.length === probeMultipliers.length &&
-        heights.every((height) => height === heights[0]) &&
-        heights[0] > 0
-      ) {
+      if (heights.length !== probeMultipliers.length) {
+        // Too small to measure at some probe height (e.g. hidden): neither
+        // confirmed nor ruled out, so it stays a candidate next time.
+        continue;
+      }
+      if (heights.every((height) => height === heights[0]) && heights[0] > 0) {
         confirmed.set(candidate, heights[0]);
+      } else {
+        this.#rejectedCandidates.set(candidate.element, candidate.signature);
       }
     }
 
