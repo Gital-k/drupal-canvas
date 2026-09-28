@@ -105,6 +105,24 @@ final class CanvasAiOrchestratorPostUpdateTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests that the prompt reimport is a no-op when the orchestrator is absent.
+   */
+  public function testPromptReimportSkipsMissingConfig(): void {
+    $this->includePostUpdateFile();
+
+    $this->config(self::ORCHESTRATOR)->delete();
+    $this->container->get(ConfigFactoryInterface::class)->reset(self::ORCHESTRATOR);
+    self::assertTrue($this->config(self::ORCHESTRATOR)->isNew());
+
+    canvas_ai_post_update_0014_reimport_orchestrator_content_only_chrome();
+    $this->container->get(ConfigFactoryInterface::class)->reset(self::ORCHESTRATOR);
+
+    // The guard on isNew() must leave a missing orchestrator missing rather
+    // than create a partial record holding only the prompt.
+    self::assertTrue($this->config(self::ORCHESTRATOR)->isNew());
+  }
+
+  /**
    * Includes the Canvas AI post-update file.
    */
   private function includePostUpdateFile(): void {
