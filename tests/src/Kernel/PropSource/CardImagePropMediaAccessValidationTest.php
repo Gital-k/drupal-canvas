@@ -6,12 +6,13 @@ namespace Drupal\Tests\canvas\Kernel\PropSource;
 
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Plugin\Canvas\ComponentSource\SingleDirectoryComponent;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\Group;
 
 /**
- * Tests validating a `card` component instance with a non-existent media ID.
+ * Tests validating component instances with invalid static prop values.
  *
  * @see \Drupal\canvas_ai\AiResponseValidator::validateComponentStructure()
  * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator
@@ -25,46 +26,89 @@ class CardImagePropMediaAccessValidationTest extends CanvasKernelTestBase {
   /**
    * {@inheritdoc}
    */
+  protected static $modules = [
+    'sdc_test_all_props',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected static $configSchemaCheckerExclusions = [
+    'canvas.' . Component::ENTITY_TYPE_ID . '.' . SingleDirectoryComponent::SOURCE_PLUGIN_ID . '.sdc_test_all_props.all-props',
+  ];
+
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp(): void {
     parent::setUp();
     $this->installEntitySchema('file');
+    $this->installEntitySchema('path_alias');
     $this->container->get(ComponentSourceManager::class)->generateComponents();
   }
 
   /**
-   * A required `image` prop referencing a non-existent media ID.
+   * Static prop values of the wrong type or referencing a missing entity.
    */
-  public function testNonExistentMediaId(): void {
-    $component = Component::load('sdc.canvas_test_sdc.card');
-    $this->assertInstanceOf(Component::class, $component);
-
-    $clientModel = [
-      'source' => $component->normalizeForClientSide()->values['propSources'],
-      'resolved' => [
-        // No media entity has this ID: nothing was ever saved with it.
-        'image' => 999999,
-        'loading' => 'lazy',
-      ],
-    ];
-    $uuid = $this->container->get('uuid')->generate();
-    $inputs = $component->getComponentSource()->clientModelToInput($uuid, $component, $clientModel, NULL);
+  public function testInvalidStaticPropValues(): void {
+    $card = $this->buildComponentTreeItem('sdc.canvas_test_sdc.card', [
+      // No media entity has this ID: nothing was ever saved with it.
+      'image' => 999999,
+      'loading' => 'lazy',
+    ]);
+    $all_props = $this->buildComponentTreeItem('sdc.sdc_test_all_props.all-props', [
+      'test_bool_default_false' => 'false',
+      'test_integer' => 'canvas',
+      'test_number' => 'canvas',
+    ]);
 
     $componentTreeItemList = $this->createDanglingComponentTreeItemList();
-    $componentTreeItemList->setValue([
-      [
-        'uuid' => $uuid,
-        'component_id' => 'sdc.canvas_test_sdc.card',
-        'component_version' => $component->getActiveVersion(),
-        'inputs' => $inputs,
-      ],
-    ]);
+    $componentTreeItemList->setValue([$card, $all_props]);
     $violations = $componentTreeItemList->validate();
 
-    $this->assertGreaterThan(
-      0,
-      $violations->count(),
-      'Expected a validation error for a required image prop referencing a non-existent media ID, got none.',
-    );
+    $violation_paths = [];
+    foreach ($violations as $violation) {
+      $violation_paths[] = $violation->getPropertyPath();
+    }
+    $this->assertSame([
+      \sprintf('0.inputs.%s.image', $card['uuid']),
+      \sprintf('1.inputs.%s.test_bool_default_false', $all_props['uuid']),
+      \sprintf('1.inputs.%s.test_integer', $all_props['uuid']),
+      \sprintf('1.inputs.%s.test_number', $all_props['uuid']),
+    ], $violation_paths);
+  }
+
+  /**
+   * Builds a component tree item from a component's default and given values.
+   *
+   * @param string $component_id
+   *   The component config entity ID.
+   * @param array $resolved
+   *   Prop values that override the component's default values.
+   *
+   * @return array
+   *   A component tree item.
+   */
+  private function buildComponentTreeItem(string $component_id, array $resolved): array {
+    $component = Component::load($component_id);
+    $this->assertInstanceOf(Component::class, $component);
+
+    $propSources = $component->normalizeForClientSide()->values['propSources'];
+    $clientModel = [
+      'source' => $propSources,
+      'resolved' => $resolved + \array_map(
+        static fn (array $propSource): mixed => $propSource['default_values']['resolved'] ?? NULL,
+        $propSources,
+      ),
+    ];
+    $uuid = $this->container->get('uuid')->generate();
+
+    return [
+      'uuid' => $uuid,
+      'component_id' => $component_id,
+      'component_version' => $component->getActiveVersion(),
+      'inputs' => $component->getComponentSource()->clientModelToInput($uuid, $component, $clientModel, NULL),
+    ];
   }
 
 }
