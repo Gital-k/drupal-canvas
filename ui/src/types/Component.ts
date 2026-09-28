@@ -28,6 +28,7 @@ export interface FieldDataItem {
     enum?: any[];
     format?: string;
     maxItems?: number;
+    minItems?: number;
   };
   default_values: DefaultValues;
   [x: string | number | symbol]: unknown;

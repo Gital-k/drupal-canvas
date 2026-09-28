@@ -143,18 +143,29 @@ export const shouldSkipPropValidation = (
 
   // An empty string on an optional field can skip validation. For example, an
   // empty + optional URI field should not check for URI validity.
+  // However, items inside a required multivalue prop (array with minItems >= 1)
+  // must still be validated: the transforms pipeline filters out empty values,
+  // which can reduce the array below its minItems constraint.
   if (newValue === '' && !target.required) {
-    return true;
+    const { selectedComponent } = inputAndUiData;
+    const propName = toPropName(name, selectedComponent);
+    const propSchemas = getPropSchemas(inputAndUiData);
+    const schema = propSchemas[propName];
+    const isRequiredArrayProp =
+      schema?.type === 'array' && (schema?.minItems ?? 0) >= 1;
+    if (!isRequiredArrayProp) {
+      return true;
+    }
   }
 
   const { selectedComponent } = inputAndUiData;
   const propName = toPropName(name, selectedComponent);
+  const propSchemas = getPropSchemas(inputAndUiData);
 
   // Object props (e.g. image) have a source shape that differs from
   // their resolved value, so they can't be validated client-side,
   // server-side validation still runs.
   // @todo Replace the blanket object skip with a more targeted approach in https://git.drupalcode.org/project/canvas/-/work_items/3591602
-  const propSchemas = getPropSchemas(inputAndUiData);
   if (
     propSchemas[propName]?.type === 'object' ||
     (propSchemas[propName]?.type === 'array' &&
@@ -335,6 +346,23 @@ export const validateNewValue = (
   if (!shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)) {
     const schemas = getPropSchemas(inputAndUiData);
     const schema = schemas?.[toPropName(fieldName, selectedComponent)];
+
+    // For required array props with minItems, an empty item value would be
+    // stripped by the transforms pipeline, potentially leaving the array
+    // below its minItems constraint. Reject the empty value immediately so
+    // the PATCH is blocked and the popover shows an inline error.
+    if (
+      schema?.type === 'array' &&
+      (schema?.minItems ?? 0) >= 1 &&
+      (newValue === '' || newValue === null || newValue === undefined)
+    ) {
+      return {
+        valid: false,
+        errors: null,
+        errorMessage: 'This field is required.',
+      };
+    }
+
     const schemaToCoerceAgainst =
       schema?.type === 'array' ? schema.items : schema;
     const isEnum = schemaToCoerceAgainst?.enum && Array.isArray(newValue);
