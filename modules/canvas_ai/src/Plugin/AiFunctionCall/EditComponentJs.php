@@ -10,6 +10,7 @@ use Drupal\ai_agents\PluginInterfaces\AiAgentContextInterface;
 use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
+use Drupal\canvas_ai\AiResponseValidator;
 use Drupal\Component\Serialization\Json;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Logger\LoggerChannelFactoryInterface;
@@ -17,7 +18,6 @@ use Drupal\Core\Plugin\Context\ContextDefinition;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Symfony\Component\Yaml\Yaml;
 
 /**
  * Plugin implementation of edit the component js function.
@@ -77,6 +77,13 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
   protected LoggerInterface $logger;
 
   /**
+   * The AI response validator.
+   *
+   * @var \Drupal\canvas_ai\AiResponseValidator
+   */
+  protected AiResponseValidator $responseValidator;
+
+  /**
    * Load from dependency injection container.
    */
   public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition): FunctionCallInterface | static {
@@ -88,6 +95,7 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
     );
     $instance->entityTypeManager = $container->get(EntityTypeManagerInterface::class);
     $instance->logger = $container->get(LoggerChannelFactoryInterface::class)->get('canvas_ai');
+    $instance->responseValidator = $container->get('canvas_ai.response_validator');
     return $instance;
   }
 
@@ -101,12 +109,15 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
       $props = $this->getContextValue('props_metadata');
       $slots = $this->getContextValue('slots_metadata') ?? '';
       $props_array = Json::decode($props);
-      // Check if the component exists.
-      /** @var \Drupal\canvas\Entity\JavaScriptComponent $component */
-      $component = $this->entityTypeManager->getStorage('js_component')->load($machine_name);
 
-      if (!$component) {
-        throw new \Exception("Could not find component $machine_name.");
+      // Every check adds to $errors instead of stopping at the first one, so
+      // the model can fix everything in a single retry.
+      $errors = [];
+
+      // Check if the component exists.
+      $component = $this->entityTypeManager->getStorage('js_component')->load($machine_name);
+      if (!$component instanceof JavaScriptComponent) {
+        $errors['Component'][] = "Could not find component $machine_name.";
       }
 
       $existing_required_props = $this->getContextValue('selected_component_required_props');
@@ -153,44 +164,54 @@ final class EditComponentJs extends FunctionCallBase implements ExecutableFuncti
 
       $required_props = array_unique($required_props);
 
-      $transformed_slots = $this->transformSlotsMetadata($slots);
+      $slot_errors = [];
+      $transformed_slots = $this->transformSlotsMetadata($slots, $slot_errors);
+      $errors = \array_merge($errors, $slot_errors);
 
-      $output = [
-        'name' => $component->get('name'),
-        'machineName' => $machine_name,
-        // Mark this code component as "internal": do not make it available to Content Creators yet.
-        // @see docs/config-management.md, section 3.2.1
-        'status' => FALSE,
-        'sourceCodeJs' => $js,
-        'sourceCodeCss' => '',
-        'compiledJs' => '',
-        'compiledCss' => '',
-        'importedJsComponents' => [],
-        'props' => $transformed_props,
-        'required' => $required_props,
-        'slots' => $transformed_slots,
-        'dataDependencies' => [],
-      ];
-      $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
-      if ($violations->count() > 0) {
-
-        // Translate constraint property paths to match YAML input structure
-        $translatedViolations = $this->translateConstraintPropertyPathsAndRoot(
-          ['' => 'component_structure.'],
-          $violations,
-          ''
-        );
-        throw new ConstraintViolationException($translatedViolations, 'Component validation errors');
+      // The structure is only meaningful when the component exists and every
+      // slot was accepted.
+      if ($component instanceof JavaScriptComponent && $slot_errors === []) {
+        $output = [
+          'name' => $component->get('name'),
+          'machineName' => $machine_name,
+          // Mark this code component as "internal": do not make it available to Content Creators yet.
+          // @see docs/config-management.md, section 3.2.1
+          'status' => FALSE,
+          'sourceCodeJs' => $js,
+          'sourceCodeCss' => '',
+          'compiledJs' => '',
+          'compiledCss' => '',
+          'importedJsComponents' => [],
+          'props' => $transformed_props,
+          'required' => $required_props,
+          'slots' => $transformed_slots,
+          'dataDependencies' => [],
+        ];
+        $violations = JavaScriptComponent::createFromClientSide($output)->getTypedData()->validate();
+        if ($violations->count() > 0) {
+          // Translate constraint property paths to match YAML input structure
+          $translatedViolations = $this->translateConstraintPropertyPathsAndRoot(
+            ['' => 'component_structure.'],
+            $violations,
+            ''
+          );
+          $errors['Component'][] = (new ConstraintViolationException($translatedViolations, 'Component validation errors'))->getMessage();
+        }
       }
 
+      if ($errors !== []) {
+        $message = $this->responseValidator->formatErrors($errors);
+        $this->logger->warning($message);
+        $this->setOutput($message);
+        return;
+      }
     }
     catch (\Exception $e) {
       $this->logger->error($e->getMessage());
-      // \Drupal\canvas_ai\Controller\CanvasBuilder::render() also YAML parsable output.
-      // @see \Drupal\canvas_ai\Controller\CanvasBuilder::render()
-      $this->setOutput(Yaml::dump(['error' => \sprintf('Failed to process Javascript component data: %s', $e->getMessage())], 10, 2));
+      $this->setOutput(\sprintf('Failed to process Javascript component data: %s', $e->getMessage()));
       return;
     }
+    \assert($component instanceof JavaScriptComponent);
     $output = [
       'js_structure' => $js,
       'props_metadata' => Json::encode($transformed_props),
