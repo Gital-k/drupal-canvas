@@ -104,6 +104,16 @@ export function getPropSchemas(inputAndUiData: InputUIData) {
 }
 
 /**
+ * Checks if a schema represents a required array (array type with minItems >= 1).
+ *
+ * @param {SchemaObject | undefined} schema - The JSON Schema to check.
+ * @return {boolean} true if the schema is a required array prop.
+ */
+function isRequiredArraySchema(schema: SchemaObject | undefined): boolean {
+  return schema?.type === 'array' && (schema?.minItems ?? 0) >= 1;
+}
+
+/**
  * Determines if JSON Schema validation should be skipped for a prop.
  *
  * Ideally, this function can be removed at some point. It's here because the
@@ -158,9 +168,7 @@ export const shouldSkipPropValidation = (
   // which can reduce the array below its minItems constraint.
   if (newValue === '' && !target.required) {
     const schema = propSchemas[propName];
-    const isRequiredArrayProp =
-      schema?.type === 'array' && (schema?.minItems ?? 0) >= 1;
-    if (!isRequiredArrayProp) {
+    if (!isRequiredArraySchema(schema)) {
       return true;
     }
   }
@@ -355,8 +363,7 @@ export const validateNewValue = (
     // below its minItems constraint. Reject the empty value immediately so
     // the PATCH is blocked and the popover shows an inline error.
     if (
-      schema?.type === 'array' &&
-      (schema?.minItems ?? 0) >= 1 &&
+      isRequiredArraySchema(schema) &&
       (newValue === '' || newValue === null || newValue === undefined)
     ) {
       return {
