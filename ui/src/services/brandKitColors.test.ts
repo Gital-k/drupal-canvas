@@ -148,6 +148,19 @@ const setup = async (colors: BrandKitColor[]) => {
       }),
     );
 
+  /** Reads the name a separate caller (e.g. the row's rename field) writes. */
+  const readName = (id: string): string | null | undefined =>
+    brandKitApi.endpoints.getBrandKit
+      .select(BRAND_KIT_ID)(store.getState())
+      .data?.colors?.find((color) => color.id === id)?.name;
+
+  // A distinct caller from `editColor`: writes the name instead of the value,
+  // the way ColorRow's rename field does, independently of the hex popover.
+  const renameColor = (id: string, name: string) =>
+    store.dispatch(
+      brandKitApi.endpoints.updateColor.initiate({ id, changes: { name } }),
+    );
+
   const readIds = (): string[] =>
     brandKitApi.endpoints.getBrandKit
       .select(BRAND_KIT_ID)(store.getState())
@@ -163,7 +176,16 @@ const setup = async (colors: BrandKitColor[]) => {
       }),
     );
 
-  return { store, readHex, readIds, readDraftHex, editColor, createColor };
+  return {
+    store,
+    readHex,
+    readName,
+    readIds,
+    readDraftHex,
+    editColor,
+    renameColor,
+    createColor,
+  };
 };
 
 describe('brand kit color optimistic edits', () => {
@@ -287,5 +309,41 @@ describe('brand kit color optimistic edits', () => {
     await edit2;
     await flush();
     expect(readHex('a')).toBe('#00ff00');
+  });
+
+  it('rolls back both edits when two writes to different fields on the same color are both rejected', async () => {
+    // Distinct callers — the hex popover and the row's rename field — writing
+    // to the same color id, each guarded by the "newest write" token.
+    const { readHex, readName, editColor, renameColor } = await setup([
+      makeColor('a', '#ff0000'),
+    ]);
+
+    const edit = editColor('a', '#0000ff'); // hex popover
+    await flush();
+    const releaseEdit = releaseWrite; // captured before rename overwrites it
+
+    const rename = renameColor('a', 'Renamed'); // row rename field
+    await flush();
+    const releaseRename = releaseWrite;
+
+    // Both patches applied optimistically.
+    expect(readHex('a')).toBe('#0000ff');
+    expect(readName('a')).toBe('Renamed');
+
+    // The older write (hex) is rejected first; its own guard skips the undo
+    // since the rename now holds the newest token.
+    releaseEdit(422);
+    await edit;
+    await flush();
+
+    // The newer write (rename) is rejected too. Its undo only reverts the
+    // name it patched — the still-applied, already-rejected hex change must
+    // not be left behind.
+    releaseRename(422);
+    await rename;
+    await flush();
+
+    expect(readHex('a')).toBe('#ff0000');
+    expect(readName('a')).toBe('a');
   });
 });
