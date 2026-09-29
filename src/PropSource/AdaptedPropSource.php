@@ -75,7 +75,13 @@ final class AdaptedPropSource extends PropSourceBase {
   public static function parse(array $sdc_prop_source): static {
     $adapter_manager = \Drupal::service(AdapterManager::class);
     \assert($adapter_manager instanceof AdapterManager);
-    $adapter_instance = $adapter_manager->createInstance(explode(self::SOURCE_TYPE_PREFIX_SEPARATOR, $sdc_prop_source['sourceType'])[1]);
+    // TRICKY: limit the split to 2 parts, because adapters support derivers,
+    // and derivative plugin IDs contain the separator themselves. So the
+    // plugin ID in `adapter:<base ID>:<derivative ID>` is everything after
+    // the first separator: `<base ID>:<derivative ID>`.
+    // @see \Drupal\canvas\Plugin\Adapter\Adapter::$deriver
+    // @see \Drupal\Component\Plugin\Discovery\DerivativeDiscoveryDecorator::decodePluginId()
+    $adapter_instance = $adapter_manager->createInstance(explode(self::SOURCE_TYPE_PREFIX_SEPARATOR, $sdc_prop_source['sourceType'], 2)[1]);
     \assert($adapter_instance instanceof AdapterInterface);
 
     // `sourceType = adapter:*` requires adapterInputs to be specified.
