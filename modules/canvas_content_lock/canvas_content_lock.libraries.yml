@@ -1,0 +1,12 @@
+content-lock:
+  # The Canvas UI HTML only renders header scripts.
+  # @see \Drupal\canvas\Controller\CanvasController::HTML
+  header: true
+  js:
+    js/canvas-content-lock.js: {}
+  css:
+    component:
+      css/canvas-content-lock.css: {}
+  dependencies:
+    - core/drupal
+    - core/drupalSettings

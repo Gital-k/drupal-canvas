@@ -1,0 +1,8 @@
+name: 'Drupal Canvas Content Lock'
+type: module
+description: 'Warns Canvas editors when another user is already editing the same page.'
+package: Drupal Canvas
+core_version_requirement: ^11.3
+php: 8.3
+dependencies:
+  - canvas:canvas

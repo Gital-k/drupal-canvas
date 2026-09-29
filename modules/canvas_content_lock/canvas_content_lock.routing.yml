@@ -1,0 +1,52 @@
+# Soft lock endpoints used by js/canvas-content-lock.js. Access mirrors the
+# auto-save PATCH route: only users who may update the page may hold its lock.
+# Cookie-only authentication and the CSRF request header restrict writes to a
+# Drupal session in the Canvas UI.
+# @see \Drupal\canvas_content_lock\Controller\ContentLockController
+canvas_content_lock.check:
+  path: '/canvas/api/v0/content-lock/{canvas_page}/check'
+  defaults:
+    _controller: 'Drupal\canvas_content_lock\Controller\ContentLockController::check'
+  methods: [GET]
+  requirements:
+    _entity_access: 'canvas_page.update'
+  options: &content_lock_options
+    no_cache: TRUE
+    _auth: ['cookie']
+    parameters:
+      canvas_page:
+        type: entity:canvas_page
+
+canvas_content_lock.acquire:
+  path: '/canvas/api/v0/content-lock/{canvas_page}/acquire'
+  defaults:
+    _controller: 'Drupal\canvas_content_lock\Controller\ContentLockController::acquire'
+  methods: [POST]
+  requirements:
+    _entity_access: 'canvas_page.update'
+    _csrf_request_header_token: 'TRUE'
+  options:
+    <<: *content_lock_options
+
+canvas_content_lock.release:
+  path: '/canvas/api/v0/content-lock/{canvas_page}/release'
+  defaults:
+    _controller: 'Drupal\canvas_content_lock\Controller\ContentLockController::release'
+  methods: [POST]
+  requirements:
+    _entity_access: 'canvas_page.update'
+    _csrf_request_header_token: 'TRUE'
+  options:
+    <<: *content_lock_options
+
+canvas_content_lock.break:
+  path: '/canvas/api/v0/content-lock/{canvas_page}/break'
+  defaults:
+    _controller: 'Drupal\canvas_content_lock\Controller\ContentLockController::break'
+  methods: [POST]
+  requirements:
+    _entity_access: 'canvas_page.update'
+    _permission: 'break canvas content lock'
+    _csrf_request_header_token: 'TRUE'
+  options:
+    <<: *content_lock_options
