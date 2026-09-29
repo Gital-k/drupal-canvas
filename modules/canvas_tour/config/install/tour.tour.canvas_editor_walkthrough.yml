@@ -1,0 +1,62 @@
+uuid: 356f711c-10d5-4bb8-83ae-a5b752eb766f
+langcode: en
+status: true
+dependencies:
+  module:
+    - canvas
+    - canvas_tour
+    - tour
+id: canvas_editor_walkthrough
+label: 'Canvas editor walkthrough'
+routes:
+  -
+    route_name: canvas.boot.empty
+tips:
+  canvas_editor_walkthrough__0:
+    id: canvas_editor_walkthrough__0
+    plugin: text
+    label: 'Welcome to the Canvas editor'
+    weight: 0
+    position: bottom
+    selector: '#canvas'
+    body: 'This is the Canvas page editor. Add, arrange, and configure components here.'
+  canvas_editor_walkthrough__1:
+    id: canvas_editor_walkthrough__1
+    plugin: text
+    label: Library
+    weight: 1
+    position: right
+    selector: '[data-testid="canvas-side-menu"] [aria-label="Library"]'
+    body: 'Browse and add components, media, and other elements to the page from here.'
+  canvas_editor_walkthrough__2:
+    id: canvas_editor_walkthrough__2
+    plugin: text
+    label: Code
+    weight: 2
+    position: right
+    selector: '[data-testid="canvas-side-menu"] [aria-label="Code"]'
+    body: 'Write and manage custom code components here.'
+  canvas_editor_walkthrough__3:
+    id: canvas_editor_walkthrough__3
+    plugin: text
+    label: Templates
+    weight: 3
+    position: right
+    selector: '[data-testid="canvas-side-menu"] [aria-label="Templates"]'
+    body: 'Manage content templates and page templates here.'
+  canvas_editor_walkthrough__4:
+    id: canvas_editor_walkthrough__4
+    plugin: text
+    label: 'Settings panel'
+    weight: 4
+    position: left
+    selector: '[data-testid="canvas-contextual-panel"]'
+    body: 'Select a component to edit its settings here, or switch to the Page data tab.'
+  canvas_editor_walkthrough__5:
+    id: canvas_editor_walkthrough__5
+    plugin: text
+    label: 'Replay this tour'
+    weight: 5
+    position: bottom
+    selector: '.js-canvas-tour-start-button'
+    body: 'Click this button any time to see this tour again.'

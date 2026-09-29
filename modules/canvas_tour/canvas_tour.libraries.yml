@@ -1,0 +1,8 @@
+canvas-tour-bridge:
+  js:
+    js/canvas-tour-bridge.js: {}
+  dependencies:
+    - core/drupal
+    - core/once
+    - core/drupalSettings
+    - tour/tour
