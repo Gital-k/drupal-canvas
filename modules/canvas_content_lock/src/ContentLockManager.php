@@ -89,7 +89,7 @@ final class ContentLockManager {
     if ($lock === NULL) {
       // Another request may create the lock between the read above and this
       // write; setIfNotExists() then fails and the check below applies.
-      if ($store->setIfNotExists($key, $this->value($page))) {
+      if ($store->setIfNotExists($key, self::value($page))) {
         return TRUE;
       }
       $lock = $store->getMetadata($key);
@@ -97,7 +97,7 @@ final class ContentLockManager {
 
     if ($lock !== NULL && $this->isOwnedByCurrentUser($lock)) {
       // Refreshes the lock's "updated" timestamp.
-      return $store->setIfOwner($key, $this->value($page));
+      return $store->setIfOwner($key, self::value($page));
     }
 
     return FALSE;
@@ -120,7 +120,7 @@ final class ContentLockManager {
    * Callers must check self::BREAK_PERMISSION.
    */
   public function break(Page $page): void {
-    $this->store()->set(self::key($page), $this->value($page));
+    $this->store()->set(self::key($page), self::value($page));
   }
 
   /**
@@ -178,7 +178,7 @@ final class ContentLockManager {
   /**
    * Builds the stored value. SharedTempStore stores owner and time itself.
    */
-  private function value(Page $page): array {
+  private static function value(Page $page): array {
     return ['entity_type' => Page::ENTITY_TYPE_ID, 'entity_id' => $page->id()];
   }
 

@@ -9,6 +9,7 @@ use Drupal\canvas_content_lock\ContentLockManager;
 use Drupal\canvas_content_lock\Controller\ContentLockController;
 use Drupal\Component\Datetime\TimeInterface;
 use Drupal\Core\KeyValueStore\KeyValueExpirableFactoryInterface;
+use Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface;
 use Drupal\Core\TempStore\SharedTempStoreFactory;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
@@ -66,9 +67,9 @@ final class ContentLockTest extends CanvasKernelTestBase {
 
     // Creates user 1 first, so that no test user bypasses permissions.
     $this->createUser();
-    $this->alice = $this->createUser([Page::EDIT_PERMISSION], 'alice');
-    $this->bob = $this->createUser([Page::EDIT_PERMISSION], 'bob');
-    $this->admin = $this->createUser([Page::EDIT_PERMISSION, ContentLockManager::BREAK_PERMISSION], 'admin');
+    $this->alice = $this->createTestUser([Page::EDIT_PERMISSION], 'alice');
+    $this->bob = $this->createTestUser([Page::EDIT_PERMISSION], 'bob');
+    $this->admin = $this->createTestUser([Page::EDIT_PERMISSION, ContentLockManager::BREAK_PERMISSION], 'admin');
 
     $this->page = Page::create([
       'title' => 'Locked page',
@@ -138,6 +139,7 @@ final class ContentLockTest extends CanvasKernelTestBase {
 
     // Backdates the lock past the timeout.
     $store = $this->container->get(KeyValueExpirableFactoryInterface::class)->get('tempstore.shared.' . ContentLockManager::COLLECTION);
+    \assert($store instanceof KeyValueStoreExpirableInterface);
     $lock = $store->get((string) $this->page->id());
     $lock->updated = $this->container->get(TimeInterface::class)->getRequestTime() - ContentLockManager::TIMEOUT - 1;
     $store->setWithExpire((string) $this->page->id(), $lock, 3600);
@@ -171,6 +173,20 @@ final class ContentLockTest extends CanvasKernelTestBase {
     $page_id = (string) $this->page->id();
     $this->page->delete();
     self::assertNull($this->container->get(SharedTempStoreFactory::class)->get(ContentLockManager::COLLECTION)->getMetadata($page_id));
+  }
+
+  /**
+   * Creates a user with the given permissions.
+   *
+   * @param string[] $permissions
+   *   The permissions to grant.
+   * @param string $name
+   *   The user name.
+   */
+  private function createTestUser(array $permissions, string $name): UserInterface {
+    $user = $this->createUser($permissions, $name);
+    \assert($user instanceof UserInterface);
+    return $user;
   }
 
   /**
