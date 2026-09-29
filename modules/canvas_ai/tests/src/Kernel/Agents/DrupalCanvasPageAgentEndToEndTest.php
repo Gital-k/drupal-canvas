@@ -9,6 +9,9 @@ use Drupal\ai\OperationType\Chat\ChatInput;
 use Drupal\ai\OperationType\Chat\ChatMessage;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas_ai\CanvasAiPermissions;
+use Drupal\canvas_ai\CanvasAiTempStore;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\EditComponents;
+use Drupal\canvas_ai\Plugin\AiFunctionCall\PlaceComponents;
 use Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder;
 use Drupal\Component\Uuid\Php;
 use Drupal\Component\Uuid\UuidInterface;
@@ -30,9 +33,9 @@ use Symfony\Component\EventDispatcher\EventDispatcherInterface;
  * Provider responses come from the ai module's echoai provider, which matches
  * each hop's request against a recorded fixture under
  * tests/resources/ai_test/requests/chat. The fixtures also pin the agent's
- * request shape: the component catalog is injected into the chat history on
- * the first hop only (catalog_only), and each later hop carries the parked
- * place_components call and its tool result.
+ * request shape: the component catalog is not among the messages, since the
+ * agent's default information tools feed the system prompt, and each later hop
+ * carries the parked place_components call and its tool result.
  *
  * @see \Drupal\ai_test\Plugin\AiProvider\EchoProvider::getMatchingRequest()
  */
@@ -260,8 +263,14 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
    * - Hop 3 sends the layout containing the hero — without it the `below`
    *   placement could not resolve — and returns the heading placement plus the
    *   closing answer.
+   *
+   * With the site opted in, the clean turn end keeps the conversation state,
+   * with each placement result cut down to its success sentence.
+   *
+   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::trimKeptToolResults()
    */
   public function testSequentialPlacementAcrossHops(): void {
+    $this->config('canvas_dev_ai.settings')->set('keep_tool_calls_in_history', TRUE)->save();
     $messages = [['role' => 'user', 'text' => 'Add a hero with a heading under it']];
     $empty_layout = [
       'regions' => [
@@ -363,6 +372,21 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
         ],
       ],
     ], ['operations' => $hop3['operations']]);
+
+    // The turn ended clean with the setting on, so its state was kept for
+    // the conversation — with each place_components result cut down to its
+    // success sentence, shedding the UUIDs, predicted layout and guidance
+    // that only served this turn. Both placements ran their tool during
+    // this turn, so both results are trimmed.
+    $conversation = $this->container->get(CanvasAiTempStore::class)->getStoredConversationState('test-conversation');
+    self::assertNotNull($conversation);
+    $tool_messages = \array_values(\array_filter(
+      $conversation['state']['chat_history'],
+      static fn (array $message): bool => $message['role'] === 'tool',
+    ));
+    self::assertCount(2, $tool_messages);
+    self::assertSame(PlaceComponents::SUCCESS_MESSAGE, $tool_messages[0]['text']);
+    self::assertSame(PlaceComponents::SUCCESS_MESSAGE, $tool_messages[1]['text']);
   }
 
   /**
@@ -373,9 +397,11 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
    * 1 finished with instead of rebuilding it from the client transcript, which
    * carries text only, so the model's first request of turn 2 still holds the
    * edit_components call turn 1 made and its result: the agent need not repeat
-   * that work.
+   * that work. The kept result is cut to its success sentence — the dump of
+   * the applied updates only served the turn that made them.
    *
    * @see https://git.drupalcode.org/project/canvas/-/work_items/3592032
+   * @see https://git.drupalcode.org/project/canvas/-/work_items/3592082
    */
   public function testSecondTurnResumesTheHistoryOfTheFirst(): void {
     // Off after install: keeping the history costs tokens on every later turn.
@@ -442,24 +468,29 @@ final class DrupalCanvasPageAgentEndToEndTest extends CanvasKernelTestBase {
     self::assertSame('The hero heading now says Goodbye.', $responses[1]['message']);
 
     // The model's first request of turn 2 carries the history turn 1 built:
-    // the catalog and user message of turn 1, the edit_components call, its
-    // result and the answer, then this turn's catalog and user message. The
-    // second catalog is the per-turn injection of the agent's
-    // get_component_context default information tool.
+    // its user message, the edit_components call, its result — the success
+    // sentence alone, with turn 1's dump of the applied updates cut off —
+    // and the answer, then this turn's user message. The component catalog
+    // is not among them: the agent's default information tools feed the
+    // system prompt.
     self::assertCount(2, $inputs);
     $input = $inputs[0];
     self::assertInstanceOf(ChatInput::class, $input);
     $messages = $input->getMessages();
     self::assertSame(
-      ['user', 'user', 'assistant', 'tool', 'assistant', 'user', 'user'],
+      ['user', 'assistant', 'tool', 'assistant', 'user'],
       \array_map(static fn (ChatMessage $message): string => $message->getRole(), $messages),
     );
-    self::assertStringContainsString('Change the hero heading to Hello', $messages[1]->getText());
-    self::assertSame('edit_components', $messages[2]->toArray()['tools'][0]['function']['name']);
-    self::assertSame('call_1', $messages[3]->getToolsId());
-    self::assertStringContainsString('The updates were applied successfully.', $messages[3]->getText());
-    self::assertSame('The hero heading now says Hello.', $messages[4]->getText());
-    self::assertStringContainsString('Now make it say Goodbye', $messages[6]->getText());
+    self::assertStringContainsString('Change the hero heading to Hello', $messages[0]->getText());
+    self::assertSame('edit_components', $messages[1]->toArray()['tools'][0]['function']['name']);
+    self::assertSame('call_1', $messages[2]->getToolsId());
+    self::assertSame(EditComponents::SUCCESS_MESSAGE, $messages[2]->getText());
+    self::assertSame('The hero heading now says Hello.', $messages[3]->getText());
+    self::assertStringContainsString('Now make it say Goodbye', $messages[4]->getText());
+
+    // Assert that the component catalog is present in the system prompt.
+    self::assertStringContainsString('sdc.canvas_test_sdc.banner', $input->getSystemPrompt());
+    self::assertStringContainsString('get_component_context', $input->getSystemPrompt());
   }
 
 }

@@ -1,5 +1,73 @@
 # @drupal-canvas/cli
 
+## 0.26.2
+
+### Patch Changes
+
+- 614dfb4: Update runtime dependencies to compatible versions.
+- Updated dependencies [614dfb4]
+  - @drupal-canvas/eslint-config@0.10.1
+
+## 0.26.1
+
+### Patch Changes
+
+- Updated dependencies [73d9fb8]
+  - drupal-canvas@0.7.1
+
+## 0.26.0
+
+### Minor Changes
+
+- ed541e3: `canvas pull` migrates safe `getPageData()` and `getSiteData()` calls
+  in pulled components to the `usePageContext()` and `useSiteContext()` hooks
+  from `drupal-canvas/react`, when the connected site advertises context-hook
+  support and the project's installed React entry exports both hooks as runtime
+  values. The migration is all-or-nothing per file: a call must be an imported
+  binding called without arguments at an unconditional hook position in a
+  component or custom hook, with no possible earlier return and no identifier
+  conflicts. Planned conversions show before the pull is confirmed and honor
+  `--yes` and `--skip-overwrite`; remaining cases, `new JsonApiClient()`
+  construction, and helper modules are reported with an AI-agent migration
+  prompt.
+
+  The codemod resolves namespace imports conservatively (bare hook calls with a
+  root import, unchanged files on shadowed or computed namespace use), treats
+  only `memo`/`forwardRef` wrappers as components, and never imports a hook
+  twice.
+
+  React wrappers are recognized by their `react` import binding and only for
+  their component argument, and a replacement hook name shadowed anywhere in the
+  file leaves the file unchanged.
+
+  Component positions are decided syntactically before the name (named callbacks
+  passed to other calls are not components), and re-exported getters leave the
+  file unchanged.
+
+### Patch Changes
+
+- Updated dependencies [ed541e3]
+  - drupal-canvas@0.7.0
+
+## 0.25.2
+
+### Patch Changes
+
+- 24ad226: `canvas pull` no longer overwrites an existing local `package.json`.
+  It now preserves the local file and adds each dependency from the pulled
+  `dependencies` that is absent from the local `dependencies`,
+  `devDependencies`, and `peerDependencies` to the local `dependencies`, using
+  the pulled version. Existing versions, scripts, and other fields are left
+  unchanged. When no local `package.json` exists, the pulled one is written as
+  before.
+
+## 0.25.1
+
+### Patch Changes
+
+- 239a9a9: Explicitly set the React component type during non-headless push so
+  existing external components become Canvas-managed React components.
+
 ## 0.25.0
 
 ### Minor Changes
