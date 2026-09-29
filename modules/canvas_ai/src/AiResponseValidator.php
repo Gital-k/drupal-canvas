@@ -9,7 +9,6 @@ use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItemListInstantiatorTrait;
 use Drupal\canvas\Validation\ConstraintPropertyPathTranslatorTrait;
 use Drupal\Component\Uuid\UuidInterface;
 use Drupal\Core\TypedData\DataDefinition;
-use Drupal\Core\TypedData\TypedDataManagerInterface;
 use Drupal\Core\Validation\BasicRecursiveValidatorFactory;
 use Symfony\Component\Validator\ConstraintViolation;
 use Symfony\Component\Validator\ConstraintViolationList;
@@ -29,19 +28,11 @@ class AiResponseValidator {
    *   The validator factory.
    * @param \Drupal\Component\Uuid\UuidInterface $uuidService
    *   The UUID service.
-   * @param \Drupal\Core\TypedData\TypedDataManagerInterface $typedDataManager
-   *   The typed data manager.
    */
   public function __construct(
     protected readonly BasicRecursiveValidatorFactory $validatorFactory,
     protected readonly UuidInterface $uuidService,
-    TypedDataManagerInterface $typedDataManager,
   ) {
-    // ComponentTreeItemListInstantiatorTrait already declares the
-    // $typedDataManager property via core's TypedDataTrait, so it is set
-    // rather than promoted as a second constructor property of the same
-    // name.
-    $this->setTypedDataManager($typedDataManager);
   }
 
   /**
@@ -115,6 +106,12 @@ class AiResponseValidator {
     $componentTreeData = [];
     foreach ($componentGroups as $groupIndex => $componentGroup) {
       if (!\is_array($componentGroup)) {
+        $this->addGarbageInputViolation(
+          $outOfBandViolations,
+          \sprintf('Component list entry `%s` must be a mapping of component IDs to their data.', $groupIndex),
+          \sprintf('%s.%s', $pathPrefix, $groupIndex),
+          $componentGroup,
+        );
         continue;
       }
       foreach ($componentGroup as $componentId => $componentData) {
@@ -175,9 +172,23 @@ class AiResponseValidator {
         $componentTreeData[] = $componentTreeItem;
 
         // Process slots recursively.
-        if (isset($componentData['slots']) && \is_array($componentData['slots'])) {
+        if (isset($componentData['slots']) && !\is_array($componentData['slots'])) {
+          $this->addGarbageInputViolation(
+            $outOfBandViolations,
+            \sprintf('Component `%s`: the `slots` value must be a mapping of slot names to component lists.', $componentId),
+            \sprintf('%s.slots', $componentPath),
+            $componentData['slots'],
+          );
+        }
+        elseif (isset($componentData['slots'])) {
           foreach ($componentData['slots'] as $slot => $slotComponentGroups) {
             if (!\is_array($slotComponentGroups)) {
+              $this->addGarbageInputViolation(
+                $outOfBandViolations,
+                \sprintf('Component `%s`: the `%s` slot must be a list of component groups.', $componentId, $slot),
+                \sprintf('%s.slots.%s', $componentPath, $slot),
+                $slotComponentGroups,
+              );
               continue;
             }
             $slotPath = \sprintf('%s.slots.%s', $componentPath, $slot);
@@ -250,16 +261,7 @@ class AiResponseValidator {
   }
 
   /**
-   * Collects violations for primitive-typed prop values core would reject.
-   *
-   * Reuses core's own primitive-type validation, the same check
-   * `PrimitiveTypeConstraintValidator` performs on a real field, via the
-   * typed data manager, rather than hand-rolled string comparisons. A value
-   * that fails is reported instead of being passed through:
-   * `Evaluator::doEvaluate()` casts any non-empty string to `TRUE` for a
-   * boolean prop, and `Evaluator::getCastedValue()` casts any string to
-   * `0`/`0.0` for an integer or number prop, so an unchecked bad value would
-   * silently store the wrong thing with no error at all.
+   * Collects violations for wrongly typed boolean, integer and number props.
    *
    * @param string $componentId
    *   The component ID, used in violation messages.
@@ -272,10 +274,6 @@ class AiResponseValidator {
    *   The component path, used to build the violation property path.
    * @param \Symfony\Component\Validator\ConstraintViolationList $violations
    *   The list to add a violation to when a value fails.
-   *
-   * @see \Drupal\Core\Validation\Plugin\Validation\Constraint\PrimitiveTypeConstraintValidator
-   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::doEvaluate()
-   * @see \Drupal\canvas\PropExpressions\StructuredData\Evaluator::getCastedValue()
    */
   private function collectPrimitiveTypeViolations(string $componentId, array $props, ?array $propSources, string $componentPath, ConstraintViolationList $violations): void {
     if ($propSources === NULL) {
@@ -291,6 +289,7 @@ class AiResponseValidator {
       if ($propValue === NULL || $dataType === NULL) {
         continue;
       }
+      // Skip values that pass core's primitive type validation for this data type.
       if ($this->getTypedDataManager()->create(DataDefinition::create($dataType), $propValue)->validate()->count() === 0) {
         continue;
       }
@@ -305,15 +304,6 @@ class AiResponseValidator {
 
   /**
    * Collects violations for supplied values the component source dropped.
-   *
-   * `ComponentSourceInterface::clientModelToInput()` leaves out a prop whose
-   * value it cannot store in the prop's field type: an image object or URL
-   * string handed to a media-bound prop, or a value the field considers
-   * empty. Field-level validation then never sees that prop, so the
-   * placement would validate and the component would render without it.
-   * Report the dropped value instead, so the model can supply one of the
-   * right shape. This naturally only fires for reference/media-shaped props:
-   * a bad enum or boolean value fails a different way and is not dropped.
    *
    * @param string $componentId
    *   The component ID.

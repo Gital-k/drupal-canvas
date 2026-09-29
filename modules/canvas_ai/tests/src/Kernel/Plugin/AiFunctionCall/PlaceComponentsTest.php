@@ -437,6 +437,41 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
     ]);
     $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.druplicon].props: Component `sdc.canvas_test_sdc.druplicon`: the props must be a mapping of prop names to values. (code garbage)', self::normalizeErrorString($result));
 
+    // A component list entry that is not a mapping of component ID to data
+    // must fail instead of being silently skipped.
+    $result = $this->getComponentToolOutput([
+      self::buildOperation(<<<YAML
+        - sdc.canvas_test_sdc.druplicon: {}
+        - 'just_a_string'
+        YAML),
+    ]);
+    $this->assertSame('Failed to place components: Component validation errors: components.1: Component list entry `1` must be a mapping of component IDs to their data. (code garbage)', self::normalizeErrorString($result));
+
+    // A slot value that is not a list of component groups must fail instead
+    // of being silently skipped.
+    $result = $this->getComponentToolOutput([
+      self::buildOperation(<<<YAML
+        - sdc.canvas_test_sdc.two_column:
+            props:
+              width: 50
+            slots:
+              column_one: 'not_a_list'
+        YAML),
+    ]);
+    $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots.column_one: Component `sdc.canvas_test_sdc.two_column`: the `column_one` slot must be a list of component groups. (code garbage)', self::normalizeErrorString($result));
+
+    // A `slots` value that is not a mapping of slot names to component lists
+    // must fail instead of being silently skipped.
+    $result = $this->getComponentToolOutput([
+      self::buildOperation(<<<YAML
+        - sdc.canvas_test_sdc.two_column:
+            props:
+              width: 50
+            slots: 'not_a_mapping'
+        YAML),
+    ]);
+    $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots: Component `sdc.canvas_test_sdc.two_column`: the `slots` value must be a mapping of slot names to component lists. (code garbage)', self::normalizeErrorString($result));
+
     // Code components (JS source) resolve props the same way as SDCs, so a
     // prop the component does not define must fail for them too.
     $this->createTestCodeComponent();
