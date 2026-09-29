@@ -1,22 +1,14 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
-
-
 import { BRAND_KIT_ID } from '@/features/brandKit/constants';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
-
-
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { BrandKit, BrandKitColor } from '@/types/CodeComponent';
-
-
-
-
 
 export interface UploadedArtifact {
   fid: number;

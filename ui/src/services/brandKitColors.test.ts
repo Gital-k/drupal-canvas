@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 
+import { BRAND_KIT_ID } from '@/features/brandKit/constants';
 import { brandKitApi } from '@/services/brandKit';
 
 import type { BrandKit, BrandKitColor } from '@/types/CodeComponent';
-
-const BRAND_KIT_ID = 'global';
 
 const makeColor = (id: string, hex: string): BrandKitColor => ({
   id,
