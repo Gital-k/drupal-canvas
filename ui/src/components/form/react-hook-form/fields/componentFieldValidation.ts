@@ -141,15 +141,22 @@ export const shouldSkipPropValidation = (
     return true;
   }
 
+  // Resolve prop name and schemas for validation checks below.
+  const { selectedComponent } = inputAndUiData;
+  const propName = toPropName(name, selectedComponent);
+  const propSchemas = getPropSchemas(inputAndUiData);
+
+  // If no schema is found for this prop, skip validation.
+  if (!propSchemas[propName]) {
+    return true;
+  }
+
   // An empty string on an optional field can skip validation. For example, an
   // empty + optional URI field should not check for URI validity.
   // However, items inside a required multivalue prop (array with minItems >= 1)
   // must still be validated: the transforms pipeline filters out empty values,
   // which can reduce the array below its minItems constraint.
   if (newValue === '' && !target.required) {
-    const { selectedComponent } = inputAndUiData;
-    const propName = toPropName(name, selectedComponent);
-    const propSchemas = getPropSchemas(inputAndUiData);
     const schema = propSchemas[propName];
     const isRequiredArrayProp =
       schema?.type === 'array' && (schema?.minItems ?? 0) >= 1;
@@ -158,9 +165,6 @@ export const shouldSkipPropValidation = (
     }
   }
 
-  const { selectedComponent } = inputAndUiData;
-  const propName = toPropName(name, selectedComponent);
-  const propSchemas = getPropSchemas(inputAndUiData);
 
   // Object props (e.g. image) have a source shape that differs from
   // their resolved value, so they can't be validated client-side,
