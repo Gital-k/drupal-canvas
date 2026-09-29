@@ -567,7 +567,7 @@ phpunit (11.3 mysql):
     - *nightly-rule
     - *manual-rule
   services:
-    - mysql:8.0
+    - mysql:8.4
   variables:
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
