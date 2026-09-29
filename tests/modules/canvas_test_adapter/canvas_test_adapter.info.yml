@@ -1,0 +1,6 @@
+name: 'Canvas test: adapter'
+type: module
+description: 'Provides an adapter that uses a deriver, for testing adapter derivative support.'
+package: Testing
+dependencies:
+  - canvas:canvas
