@@ -67,6 +67,11 @@ parameters:
       message: "#^Class .* extends @internal class#"
       count: 1
       path: src/MediaLibraryCanvasPropOpener.php
+    # Test modules deliberately build on Canvas' internal plugin base classes.
+    -
+      message: "#^Class .* extends @internal class#"
+      count: 1
+      path: tests/modules/canvas_test_adapter/src/Plugin/Adapter/StringCaseAdapter.php
     -
       message: "#^Method Drupal\\\\canvas\\\\Entity\\\\ComponentTreeConfigEntityBase\\:\\:preCreate\\(\\) has no return type specified\\.$#"
       identifier: missingType.return

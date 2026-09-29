@@ -21,6 +21,13 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[RunTestsInSeparateProcesses]
 class AdaptedPropSourceTest extends PropSourceTestBase {
 
+  /**
+   * {@inheritdoc}
+   */
+  protected static $modules = [
+    'canvas_test_adapter',
+  ];
+
   public function test(): void {
     // 2. user created access
 
@@ -241,6 +248,68 @@ class AdaptedPropSourceTest extends PropSourceTestBase {
     // value of the main property.
     // This proves that editing a StaticPropSource automatically updates it.
     self::assertSame('2020-04-16', $complex_example_bc->toArray()['adapterInputs']['oldest']['value']);
+  }
+
+  /**
+   * Tests an adapter provided by a deriver: its plugin ID contains a colon.
+   *
+   * @see \Drupal\canvas_test_adapter\Plugin\Adapter\StringCaseAdapter
+   * @see https://www.drupal.org/i/3543191
+   */
+  public function testDerivedAdapter(): void {
+    $derived_example = AdaptedPropSource::parse([
+      'sourceType' => 'adapter:canvas_test_string_case:upper',
+      'adapterInputs' => [
+        'text' => [
+          'sourceType' => 'static:field_item:string',
+          'value' => 'Adapters do support derivatives',
+          'expression' => 'ℹ︎string␟value',
+        ],
+      ],
+    ]);
+    // First, get the string representation and parse it back, to prove
+    // serialization and deserialization works.
+    $json_representation = (string) $derived_example;
+    $this->assertSame('{"sourceType":"adapter:canvas_test_string_case:upper","adapterInputs":{"text":{"sourceType":"static:field_item:string","value":"Adapters do support derivatives","expression":"ℹ︎string␟value"}}}', $json_representation);
+    $derived_example = PropSource::parse(json_decode($json_representation, TRUE));
+    $this->assertInstanceOf(AdaptedPropSource::class, $derived_example);
+    // The contained information read back out: the derivative ID survives.
+    $this->assertSame('adapter:canvas_test_string_case:upper', $derived_example->getSourceType());
+    // The `upper` derivative is evaluated, not the base plugin — which is a
+    // no-op, and hence would return the input unchanged.
+    self::assertEquals(
+      new EvaluationResult(
+        'ADAPTERS DO SUPPORT DERIVATIVES',
+        new CacheableMetadata(),
+      ),
+      $derived_example->evaluate(NULL, is_required: TRUE),
+    );
+
+    // Every derivative resolves to its own plugin, and an adapter without a
+    // derivative ID keeps resolving to the base plugin.
+    $expectations = [
+      'adapter:canvas_test_string_case:upper' => 'ADAPTERS DO SUPPORT DERIVATIVES',
+      'adapter:canvas_test_string_case:lower' => 'adapters do support derivatives',
+      'adapter:canvas_test_string_case' => 'Adapters do support derivatives',
+    ];
+    foreach ($expectations as $source_type => $expected_value) {
+      $prop_source = AdaptedPropSource::parse([
+        'sourceType' => $source_type,
+        'adapterInputs' => [
+          'text' => [
+            'sourceType' => 'static:field_item:string',
+            'value' => 'Adapters do support derivatives',
+            'expression' => 'ℹ︎string␟value',
+          ],
+        ],
+      ]);
+      self::assertSame($source_type, $prop_source->getSourceType());
+      self::assertEquals(
+        new EvaluationResult($expected_value, new CacheableMetadata()),
+        $prop_source->evaluate(NULL, is_required: TRUE),
+        \sprintf('Unexpected evaluation result for `%s`.', $source_type),
+      );
+    }
   }
 
 }
