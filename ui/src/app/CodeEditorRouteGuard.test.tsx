@@ -7,10 +7,7 @@ import { getCanvasSettings } from '@/utils/drupal-globals';
 
 const renderGuardedRoute = () =>
   render(
-    <MemoryRouter
-      initialEntries={['/code-editor/component/heading']}
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-    >
+    <MemoryRouter initialEntries={['/code-editor/component/heading']}>
       <Routes>
         <Route path="/" element={<div>Canvas home</div>} />
         <Route

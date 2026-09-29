@@ -17,10 +17,7 @@ const AppWrapper = ({
   location: string;
   path: string;
 }>) => (
-  <MemoryRouter
-    initialEntries={[location]}
-    future={{ v7_relativeSplatPath: true, v7_startTransition: true }} // Avoid React Router future warnings.
-  >
+  <MemoryRouter initialEntries={[location]}>
     <Routes>
       <Route
         path={path}

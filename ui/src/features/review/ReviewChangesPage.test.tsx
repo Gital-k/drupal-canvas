@@ -164,10 +164,7 @@ const ReviewPageTestApp = ({
   state?: unknown;
 }) => (
   <Theme accentColor="blue" hasBackground={false}>
-    <MemoryRouter
-      initialEntries={[{ pathname: initialPath, state }]}
-      future={{ v7_relativeSplatPath: true, v7_startTransition: true }}
-    >
+    <MemoryRouter initialEntries={[{ pathname: initialPath, state }]}>
       <Routes>
         <Route path="/review" element={<ReviewChangesPage />} />
         <Route
