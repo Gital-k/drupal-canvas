@@ -98,42 +98,6 @@ final class CanvasDevAiBuilder extends ControllerBase {
   }
 
   /**
-   * Drops what a turn the user stopped left behind.
-   *
-   * A turn ends on the client: the wizard stops sending hops, and nothing
-   * else tells this controller the turn is over. The agent the last hop
-   * parked stays in the tempstore holding a tool call it never ran, which no
-   * later turn may resume — replaying one to the model breaks the chat on
-   * every major provider. The conversation history goes with it, because it
-   * stops short of the work this turn already applied to the page.
-   *
-   * The state is read from a PrivateTempStore, so a request can only reach
-   * what the account making it stored.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::forgetTurn()
-   */
-  public function stop(Request $request): JsonResponse {
-    $token = $request->headers->get('X-CSRF-Token') ?? '';
-    if (!$this->csrfTokenGenerator->validate($token, 'canvas_ai.canvas_builder')) {
-      throw new AccessDeniedHttpException('Invalid CSRF token');
-    }
-
-    $payload = Json::decode($request->getContent());
-    if (!\is_array($payload) || !\is_string($payload['request_id'] ?? NULL) || $payload['request_id'] === '') {
-      return new JsonResponse([
-        'status' => FALSE,
-        'message' => 'The request is missing the required "request_id" value.',
-      ], Response::HTTP_BAD_REQUEST);
-    }
-
-    $this->forgetTurn($payload);
-    return new JsonResponse(['status' => TRUE]);
-  }
-
-  /**
    * Renders the Drupal Canvas AI calls.
    *
    * @param \Symfony\Component\HttpFoundation\Request $request

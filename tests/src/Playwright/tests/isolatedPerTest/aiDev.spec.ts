@@ -391,18 +391,6 @@ test.describe('AI dev chat', () => {
       // request is gone can no longer be continued.
       await route.continue().catch(() => {});
     });
-    // The turn's parked agent state is dropped on the backend when it stops.
-    // The response is recorded rather than the request: canvas_ai_test answers
-    // the other AI routes from fixtures, and this one has to reach the
-    // controller.
-    // @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-    const stopResponses: unknown[] = [];
-    await page.route('**/admin/api/canvas/ai-dev/stop', async (route) => {
-      const response = await route.fetch();
-      stopResponses.push(await response.json());
-      await route.fulfill({ response });
-    });
-
     await drupal.login({ username: 'ai_editor', password: 'ai_editor' });
     await canvas.createCanvas();
     await ai.openPanel();
@@ -460,11 +448,9 @@ test.describe('AI dev chat', () => {
     ).toBeHidden();
     await expect(progressMessage.last().locator('.aiLoader')).toBeHidden();
 
-    // No hop follows the one that was in flight, and the backend was told to
-    // drop what that turn parked.
+    // No hop follows the one that was in flight.
     releaseHeldHop();
     expect(requests).toBe(3);
-    await expect.poll(() => stopResponses).toEqual([{ status: true }]);
 
     // The chat is usable again: the stop button is hidden, the Tools trigger
     // is unlocked and the input takes another prompt.

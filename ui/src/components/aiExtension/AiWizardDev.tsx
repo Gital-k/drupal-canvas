@@ -435,7 +435,11 @@ const DEEP_CHAT_MESSAGE_STYLES = {
   },
 } as const;
 
+// The position is set explicitly: with a custom button in the inside-end
+// slot, deep-chat would otherwise move the submit button, and the loader that
+// replaces it while a turn runs, to outside-end, past the input's edge.
 const DEEP_CHAT_SUBMIT_BUTTON_STYLES = {
+  position: 'inside-end',
   disabled: {
     container: {
       default: {
@@ -598,12 +602,15 @@ const DEEP_CHAT_TOOL_BUTTON_DISABLED_STYLES = {
 } as const;
 
 // Layout of the stop button, shared by its states: deep-chat unsets one
-// state's container styles before applying the next state's. It sits where
-// the submit button does and carries its own background in the icon, so the
-// two line up while only one of them is shown.
+// state's container styles before applying the next state's. deep-chat gives
+// every inside-end button the same absolute slot, so the wider right margin
+// is what places this one beside the submit button and its loader, which
+// keep the 8px slot, rather than on top of them.
 const DEEP_CHAT_STOP_BUTTON_CONTAINER = {
-  display: 'inherit',
-  marginRight: '8px',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  marginRight: '40px',
   marginBottom: '12px',
   cursor: 'pointer',
 } as const;
@@ -643,40 +650,6 @@ const DEEP_CHAT_STOP_BUTTON_HIDDEN_STYLES = {
 // only thing that ends a turn, so the turn has to answer with something.
 const TURN_STOPPED_MESSAGE =
   'You interrupted the agent. What would you like to change?';
-
-/**
- * Tells the backend that a turn ended without finishing.
- *
- * A stopped turn simply stops hopping, so nothing else tells the server it is
- * over: the agent the last hop parked stays in the tempstore, holding a tool
- * call that was never run. The endpoint drops it, along with the conversation
- * history that stops short of this turn, so the next turn starts clean.
- *
- * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
- */
-const forgetTurnOnServer = async (
-  requestId: string,
-  conversationId: string,
-  csrfToken: string,
-): Promise<void> => {
-  try {
-    await fetch('/admin/api/canvas/ai-dev/stop', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken,
-      },
-      body: JSON.stringify({
-        request_id: requestId,
-        conversation_id: conversationId,
-      }),
-    });
-  } catch (error) {
-    // The turn is over for the user either way, and what is left behind is a
-    // tempstore row that expires on its own. Never surface this in the chat.
-    console.error('Could not drop the stopped turn on the server:', error);
-  }
-};
 
 // Memoized DeepChat so it only re-renders when its props change identity.
 const MemoDeepChat = memo(DeepChat);
@@ -892,9 +865,8 @@ const AiWizardDev = () => {
   // result is never applied, so the page stops changing as soon as this runs;
   // the loop guard covers the case where that hop already landed. The server
   // finishes the hop it is executing either way — the request cannot be
-  // recalled — so the turn's parked state is dropped on the backend rather
-  // than left for a later turn to resume.
-  // @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
+  // recalled — and the state that hop parks is never resumed: the next turn
+  // sends a new request_id, and the row expires with the tempstore.
   const stopTurn = useCallback(() => {
     // deep-chat fires onClick in the hidden state too, so an idle chat has to
     // ignore the click itself.
@@ -940,7 +912,6 @@ const AiWizardDev = () => {
         },
       },
       initialState: 'disabled',
-      tooltip: { text: 'Stop' },
       onClick: stopTurn,
     }),
     [stopTurn],
@@ -1015,9 +986,6 @@ const AiWizardDev = () => {
       // one, so a turn that was stopped before it still owes deep-chat a
       // response.
       let answered = false;
-      // Identifies this chat turn, and names the turn the cleanup in `finally`
-      // asks the backend to drop.
-      let requestId = '';
 
       try {
         const MAX_FILE_SIZE = drupalSettings?.canvas?.canvasAiMaxFileSize;
@@ -1034,7 +1002,7 @@ const AiWizardDev = () => {
 
         // Identifies this chat turn. The controller keys the paused agent on
         // it, so every hop of the same turn must send the same value.
-        requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        const requestId = `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
         const abortController = new AbortController();
         abortControllerRef.current = abortController;
         turn = { stopped: false, placed: false };
@@ -1210,18 +1178,6 @@ const AiWizardDev = () => {
         // empty form.
         if (turn?.placed) {
           componentSelectionUtils.unsetSelectedComponent();
-        }
-        // The backend is still holding what this turn parked, and no further
-        // hop is coming to collect it. Unmount stops the turn the same way, so
-        // it is cleaned up here too. A press that lands once the answer is
-        // already delivered stopped nothing: that turn ended cleanly, and the
-        // backend has stored what the next turn resumes from.
-        if (turn?.stopped && !answered && requestId !== '') {
-          void forgetTurnOnServer(
-            requestId,
-            conversationIdRef.current,
-            csrfToken,
-          );
         }
         // Also runs when the turn was stopped or the component unmounted, so
         // neither can leave the selection locked.

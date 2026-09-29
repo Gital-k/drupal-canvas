@@ -16,8 +16,6 @@ use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Extension\ModuleInstallerInterface;
-use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\canvas\Kernel\Traits\RequestTrait;
 use Drupal\Tests\canvas_ai\Kernel\Traits\CanvasAiDevHopTrait;
@@ -441,112 +439,6 @@ final class CanvasAiDevControllerTest extends CanvasKernelTestBase {
     ]);
     self::assertTrue($response['status']);
     self::assertNull($temp_store->getStoredConversationState('test-conversation'));
-  }
-
-  /**
-   * The stop endpoint drops both the turn's state and the conversation's.
-   *
-   * A stopped turn parked an agent holding a tool call it never ran, which no
-   * later turn may resume. The conversation history goes with it, because it
-   * stops short of the work the stopped turn already applied to the page.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  public function testStopEndpointDropsWhatTheStoppedTurnParked(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-    $this->setUpAiDevHops();
-
-    $temp_store = $this->container->get(CanvasAiTempStore::class);
-    $temp_store->setStoredAgentState('test-request', 'canvas_agent', ['looped' => 3]);
-    $temp_store->setStoredConversationState('test-conversation', 'canvas_agent', ['looped' => 1]);
-
-    $response = $this->stopTurn();
-
-    self::assertTrue($response['status']);
-    self::assertNull($temp_store->getStoredAgentState('test-request'));
-    self::assertNull($temp_store->getStoredConversationState('test-conversation'));
-  }
-
-  /**
-   * The stop endpoint drops only the turn the request names.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  public function testStopEndpointDropsOnlyTheTurnItNames(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-    $this->setUpAiDevHops();
-
-    $temp_store = $this->container->get(CanvasAiTempStore::class);
-    $temp_store->setStoredAgentState('test-request', 'canvas_agent', ['looped' => 3]);
-    $temp_store->setStoredAgentState('other-request', 'canvas_agent', ['looped' => 2]);
-
-    $this->stopTurn(['request_id' => 'test-request']);
-
-    self::assertNull($temp_store->getStoredAgentState('test-request'));
-    self::assertNotNull($temp_store->getStoredAgentState('other-request'));
-  }
-
-  /**
-   * The stop endpoint cannot reach a turn another account parked.
-   *
-   * The state lives in a PrivateTempStore, which scopes every read and write
-   * to the account making it.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  public function testStopEndpointCannotReachAnotherAccountsTurn(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-    $this->setUpAiDevHops();
-
-    $owner = $this->container->get(AccountProxyInterface::class)->getAccount();
-    $temp_store = $this->container->get(CanvasAiTempStore::class);
-    $temp_store->setStoredAgentState('test-request', 'canvas_agent', ['looped' => 3]);
-
-    // Another account stops a turn under the same request_id.
-    $other = $this->createUser([CanvasAiPermissions::USE_CANVAS_AI]);
-    self::assertInstanceOf(AccountInterface::class, $other);
-    $this->setCurrentUser($other);
-    $response = $this->stopTurn();
-    self::assertTrue($response['status']);
-
-    $this->setCurrentUser($owner);
-    self::assertNotNull($temp_store->getStoredAgentState('test-request'));
-  }
-
-  /**
-   * The stop endpoint needs a request_id to name the turn it drops.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  public function testStopEndpointRequiresARequestId(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-    $this->setUpAiDevHops();
-
-    $response = $this->stopTurn(['request_id' => '']);
-
-    self::assertFalse($response['status']);
-    self::assertSame('The request is missing the required "request_id" value.', $response['message']);
-  }
-
-  /**
-   * The stop endpoint rejects a request without a valid CSRF token.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  public function testStopEndpointRejectsInvalidCsrfToken(): void {
-    $this->container->get(ModuleInstallerInterface::class)->install(['canvas_dev_ai']);
-    $this->refreshContainer();
-
-    $request = Request::create('/admin/api/canvas/ai-dev/stop', 'POST');
-    $request->headers->set('X-CSRF-Token', 'invalid-token');
-
-    $this->expectException(AccessDeniedHttpException::class);
-    $this->expectExceptionMessage('Invalid CSRF token');
-    $this->request($request);
   }
 
   /**

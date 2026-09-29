@@ -29,11 +29,6 @@ trait CanvasAiDevHopTrait {
   private const AI_DEV_PATH = '/admin/api/canvas/ai-dev';
 
   /**
-   * The controller path a stopped turn is reported to.
-   */
-  private const AI_DEV_STOP_PATH = '/admin/api/canvas/ai-dev/stop';
-
-  /**
    * The number of hops one turn may take before the test gives up.
    */
   private const MAX_HOPS = 20;
@@ -92,52 +87,16 @@ trait CanvasAiDevHopTrait {
    *   The decoded JSON response.
    */
   protected function hop(array $prompt): array {
-    return $this->postToAiDev(self::AI_DEV_PATH, $prompt + [
-      'request_id' => 'test-request',
-      'conversation_id' => 'test-conversation',
-      'entity_type' => 'canvas_page',
-      'derived_proptypes' => [],
-      'selected_component_required_props' => [],
-    ]);
-  }
-
-  /**
-   * Reports a stopped turn and returns the decoded response.
-   *
-   * The wizard sends this when the user stops a turn: no further hop is
-   * coming, so the controller drops what the turn parked.
-   *
-   * @param array $payload
-   *   The values this request sends, merged over the required keys.
-   *
-   * @return array
-   *   The decoded JSON response.
-   *
-   * @see \Drupal\canvas_dev_ai\Controller\CanvasDevAiBuilder::stop()
-   */
-  protected function stopTurn(array $payload = []): array {
-    return $this->postToAiDev(self::AI_DEV_STOP_PATH, $payload + [
-      'request_id' => 'test-request',
-      'conversation_id' => 'test-conversation',
-    ]);
-  }
-
-  /**
-   * POSTs a JSON body to one of the canvas_dev_ai routes.
-   *
-   * @param string $path
-   *   The route path.
-   * @param array $body
-   *   The request body, encoded as JSON.
-   *
-   * @return array
-   *   The decoded JSON response.
-   */
-  private function postToAiDev(string $path, array $body): array {
     $request = Request::create(
-      $path,
+      self::AI_DEV_PATH,
       'POST',
-      content: Json::encode($body),
+      content: Json::encode($prompt + [
+        'request_id' => 'test-request',
+        'conversation_id' => 'test-conversation',
+        'entity_type' => 'canvas_page',
+        'derived_proptypes' => [],
+        'selected_component_required_props' => [],
+      ]),
       server: ['CONTENT_TYPE' => 'application/json'],
     );
     // The token is bound to the session, so the request needs a session cookie
