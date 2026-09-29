@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\ContentTranslation\SymmetricalTranslationSynchronizationTrait;
 use Drupal\canvas\Controller\ClientServerConversionTrait;
 use Drupal\canvas\Controller\EntityFormTrait;
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Form\ClientFormSubmissionHelper;
@@ -64,11 +65,29 @@ class ClientDataToEntityConverter {
    * the auto-save entry only captures the edited translation, so the in-place
    * synchronization of sibling translations is never persisted.
    *
+   * Config entities that store a component tree (content templates, patterns,
+   * page variants) are supported too, but only their component tree is updated:
+   * they have no entity form fields, no content_translation field
+   * synchronization and no ::validate(), so all of that is skipped for them.
+   *
+   * @param array $client_data
+   *   The client-side data, keyed by `layout`, `model` and
+   *   `entity_form_fields`. The last must be NULL (or empty) when $entity is
+   *   not fieldable.
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|\Drupal\canvas\Entity\ComponentTreeEntityInterface $entity
+   *   The entity to apply the client data onto, updated by reference.
+   * @param bool $validate
+   *   Whether to validate. Only the component tree conversion honors this when
+   *   $entity is not fieldable, because config entities have no ::validate().
+   * @param \Drupal\Core\Entity\FieldableEntityInterface|null $preview_entity
+   *   The entity a config entity's component tree is being previewed against;
+   *   NULL for fieldable entities, which host their own component tree.
+   *
    * @see \Drupal\canvas\Controller\ApiAutoSaveController::getConflictAwareContentEntityViolations()
    *
    * @todo remove the validate flag in https://www.drupal.org/i/3505018.
    */
-  public function convert(array $client_data, FieldableEntityInterface $entity, bool $validate = TRUE): void {
+  public function convert(array $client_data, FieldableEntityInterface|ComponentTreeEntityInterface $entity, bool $validate = TRUE, ?FieldableEntityInterface $preview_entity = NULL): void {
     $expected_keys = ['layout', 'model', 'entity_form_fields'];
     if (!empty(array_diff_key($client_data, array_flip($expected_keys)))) {
       throw new \LogicException();
@@ -81,11 +100,33 @@ class ClientDataToEntityConverter {
       \assert($layout['nodeType'] === 'region');
       \assert($layout['id'] === 'content');
       \assert(\is_array($layout['components']));
-      $item_list->setValue(self::convertClientToServer($layout['components'], $model, $entity, $validate));
+      if ($entity instanceof FieldableEntityInterface) {
+        // A fieldable entity hosts its own component tree.
+        $item_list->setValue(self::convertClientToServer($layout['components'], $model, $entity, $validate));
+      }
+      else {
+        // A config entity does not host the component tree it stores: that is
+        // the entity it is previewed against, or a stand-in for a page variant.
+        $host_entity = self::resolveHostEntity($entity, $preview_entity);
+        // TRICKY: ComponentTreeLoader::load() hands back a *dangling* component
+        // tree for a config entity, so setting a value on $item_list would
+        // never reach the entity. Write the tree back explicitly instead.
+        // @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::getComponentTree()
+        $entity->setComponentTree(self::convertClientToServer($layout['components'], $model, $host_entity, $validate));
+      }
     }
     catch (ConstraintViolationException $e) {
       // @todo Remove iterator_to_array() after https://www.drupal.org/project/drupal/issues/3497677
       throw new ConstraintViolationException(new EntityConstraintViolationList($entity, iterator_to_array($e->getConstraintViolationList())));
+    }
+
+    if (!$entity instanceof FieldableEntityInterface) {
+      // Everything below requires a fieldable entity: content_translation's
+      // field synchronization, the entity form that `entity_form_fields` is
+      // submitted through, and ::validate(). A config entity storing a
+      // component tree has none of them.
+      \assert(\is_null($entity_form_fields) || $entity_form_fields === []);
+      return;
     }
 
     // Converge stale sibling translations' non-translatable component inputs

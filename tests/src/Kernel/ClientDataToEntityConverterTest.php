@@ -9,7 +9,11 @@ use Drupal\canvas\ClientDataToEntityConverter;
 use Drupal\canvas\Controller\ApiLayoutController;
 use Drupal\canvas\Controller\EntityFormTrait;
 use Drupal\canvas\Entity\Component;
+use Drupal\canvas\Entity\ComponentTreeEntityInterface;
+use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\EntityConstraintViolationList;
+use Drupal\canvas\Entity\PageVariant;
+use Drupal\canvas\Entity\Pattern;
 use Drupal\canvas\Entity\VersionedConfigEntityInterface;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\canvas\Plugin\Field\FieldType\ComponentTreeItem;
@@ -499,6 +503,86 @@ class ClientDataToEntityConverterTest extends KernelTestBase {
     $node = $this->assertConvert($client_json, [], 'The updated title.');
     self::assertCount(0, $autoSave->getEntityFormViolations($node));
     self::assertEquals(TestTime::$requestTime, $node->getChangedTime());
+  }
+
+  /**
+   * Tests convert() on config entities that store a component tree.
+   *
+   * Content templates, patterns and page variants are not fieldable, so
+   * ComponentTreeLoader hands back a *dangling* component tree for them: the
+   * converter has to write the converted tree back onto the entity explicitly,
+   * and has to skip everything that needs a fieldable entity (entity form
+   * fields, translation synchronization, ::validate()).
+   *
+   * @see \Drupal\canvas\Entity\ComponentTreeConfigEntityBase::getComponentTree()
+   */
+  #[TestWith([ContentTemplate::class])]
+  #[TestWith([Pattern::class])]
+  #[TestWith([PageVariant::class])]
+  public function testConvertComponentTreeConfigEntity(string $entity_class): void {
+    $client_json = $this->getValidClientJson(FALSE);
+    // A config entity has no entity form, so the client sends no form fields.
+    // @see \Drupal\canvas\Controller\ApiLayoutController::updateEntity()
+    $client_json['entity_form_fields'] = NULL;
+
+    // Only a content template is rendered against a previewed entity; the other
+    // two resolve their own host entity (or have none at all).
+    $preview_entity = $entity_class === ContentTemplate::class ? $this->createTestNode() : NULL;
+    $entity = self::createComponentTreeConfigEntity($entity_class);
+    self::assertCount(0, $entity->getComponentTree());
+
+    $converter = $this->container->get(ClientDataToEntityConverter::class);
+    \assert($converter instanceof ClientDataToEntityConverter);
+    $converter->convert($client_json, $entity, validate: FALSE, preview_entity: $preview_entity);
+
+    // The converted tree reached the entity rather than the dangling item list.
+    $tree = $entity->getComponentTree()->getValue();
+    self::assertSame([
+      [
+        'uuid' => self::TEST_HEADING_UUID,
+        'component_id' => 'sdc.canvas_test_sdc.heading',
+        'component_version' => '8c01a2bdb897a810',
+      ],
+      [
+        'uuid' => self::TEST_IMAGE_UUID,
+        'component_id' => 'sdc.canvas_test_sdc.image',
+        'component_version' => 'fb40be57bd7e0973',
+      ],
+      [
+        'uuid' => self::TEST_BLOCK,
+        'component_id' => 'block.system_branding_block',
+        'component_version' => Component::load('block.system_branding_block')?->getActiveVersion(),
+      ],
+    ], \array_map(static fn (array $item) => \array_filter(\array_diff_key($item, \array_flip(['inputs']))), $tree));
+    // And it carries exactly the inputs the client model converts to.
+    self::assertEqualsCanonicalizing(
+      $this->getValidConvertedInputs(FALSE),
+      \array_combine(\array_column($tree, 'uuid'), \array_column($tree, 'inputs')),
+    );
+
+    // The entity is still valid config: a config entity has no ::validate(), so
+    // the converter must leave it in a saveable state.
+    $entity->save();
+  }
+
+  /**
+   * Creates an empty config entity of the given component-tree-storing class.
+   */
+  private static function createComponentTreeConfigEntity(string $entity_class): ComponentTreeEntityInterface {
+    $values = match ($entity_class) {
+      ContentTemplate::class => [
+        'id' => 'node.article.full',
+        'content_entity_type_id' => 'node',
+        'content_entity_type_bundle' => 'article',
+        'content_entity_type_view_mode' => 'full',
+      ],
+      Pattern::class => ['id' => 'test_pattern', 'label' => 'Test pattern'],
+      PageVariant::class => ['id' => 'test_variant', 'label' => 'Test variant'],
+      default => throw new \LogicException("$entity_class does not store a component tree."),
+    };
+    $entity = $entity_class::create($values + ['component_tree' => []]);
+    \assert($entity instanceof ComponentTreeEntityInterface);
+    return $entity;
   }
 
   /**
