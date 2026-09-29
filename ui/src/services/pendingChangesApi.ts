@@ -185,17 +185,10 @@ export const pendingChangesApi = createApi({
           // Canvas will not be aware of any changes made in custom code here, therefore if Canvas doesn't re-request
           // after publishing, the auto-save request could wipe out any changes that were made in
           // any hook_entity_presave code
-          //
-          // Also invalidate the code/config component lists: publishing can change whether a
-          // component is still in use elsewhere (e.g. the last instance of a code component was
-          // removed from a page), which affects the backend-computed `delete-form` link used to
-          // gate deletion. Usage is only authoritative once changes are published, so this is
-          // deliberately scoped to publish rather than every auto-save to avoid frequent re-fetches.
           dispatch(
             componentAndLayoutApi.util.invalidateTags([
               { type: 'Layout' },
               { type: 'CodeComponents', id: 'LIST' },
-              { type: 'Components', id: 'LIST' },
             ]),
           );
           dispatch(setPreviousPendingChanges());
