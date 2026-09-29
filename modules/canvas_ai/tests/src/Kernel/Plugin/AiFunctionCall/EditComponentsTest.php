@@ -256,7 +256,7 @@ final class EditComponentsTest extends CanvasKernelTestBase {
     $this->container->get(AccountProxyInterface::class)->setAccount($user_a);
     $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getLayoutWithImageComponent());
     $result = $this->getToolOutput('canvas_ai:edit_components', ['component_edits' => $edits]);
-    $this->assertSame(\sprintf('Failed to edit components: %s', self::MEDIA_ACCESS_DENIED_MESSAGE), self::normalizeErrorString($result));
+    $this->assertSame(\sprintf('Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - %s', self::MEDIA_ACCESS_DENIED_MESSAGE), self::normalizeErrorString($result));
   }
 
   /**

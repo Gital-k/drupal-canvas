@@ -435,7 +435,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
     $this->container->get(AccountProxyInterface::class)->setAccount($user_a);
     $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout('multi_region_empty'));
     $result = $this->getComponentToolOutput([self::buildOperation($components_yaml)]);
-    $this->assertSame(\sprintf('Failed to place components: %s', self::MEDIA_ACCESS_DENIED_MESSAGE), self::normalizeErrorString($result));
+    $this->assertSame(\sprintf('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - %s', self::MEDIA_ACCESS_DENIED_MESSAGE), self::normalizeErrorString($result));
   }
 
   /**
