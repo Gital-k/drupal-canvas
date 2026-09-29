@@ -1,10 +1,5 @@
-import {
-  createBrowserRouter,
-  Navigate,
-  Outlet,
-  RouterProvider,
-  useParams,
-} from 'react-router-dom';
+import { createBrowserRouter, Navigate, Outlet, useParams } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { Flex } from '@radix-ui/themes';
 
 import App from '@/app/App';

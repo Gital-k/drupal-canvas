@@ -1,5 +1,5 @@
 import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router';
 import { Theme } from '@radix-ui/themes';
 
 import ErrorBoundary from '@/components/error/ErrorBoundary';
