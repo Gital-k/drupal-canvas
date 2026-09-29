@@ -107,7 +107,7 @@ class AiResponseValidator {
       if (!\is_array($componentGroup)) {
         $this->addGarbageInputViolation(
           $outOfBandViolations,
-          \sprintf('Component list entry `%s` must be a mapping of component IDs to their data.', $groupIndex),
+          \sprintf('Component entry %s cannot be processed: it does not contain the component details in the expected YAML format.', \json_encode($componentGroup)),
           \sprintf('%s.%s', $pathPrefix, $groupIndex),
           $componentGroup,
         );
@@ -166,7 +166,7 @@ class AiResponseValidator {
         if (isset($componentData['slots']) && !\is_array($componentData['slots'])) {
           $this->addGarbageInputViolation(
             $outOfBandViolations,
-            \sprintf('Component `%s`: the `slots` value must be a mapping of slot names to component lists.', $componentId),
+            \sprintf('The `slots` value %s cannot be processed: each slot name must be a key holding its own list of components.', \json_encode($componentData['slots'])),
             \sprintf('%s.slots', $componentPath),
             $componentData['slots'],
           );
@@ -176,7 +176,7 @@ class AiResponseValidator {
             if (!\is_array($slotComponentGroups)) {
               $this->addGarbageInputViolation(
                 $outOfBandViolations,
-                \sprintf('Component `%s`: the `%s` slot must be a list of component groups.', $componentId, $slot),
+                \sprintf('The `%s` slot value %s cannot be processed: a slot must hold a YAML list of components.', $slot, \json_encode($slotComponentGroups)),
                 \sprintf('%s.slots.%s', $componentPath, $slot),
                 $slotComponentGroups,
               );
