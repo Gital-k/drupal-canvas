@@ -254,7 +254,7 @@ class AiResponseValidator {
   /**
    * Collects violations for wrongly typed boolean, integer and number props.
    *
-   * @todo Remove this workaround once https://git.drupalcode.org/project/canvas/-/work_items/3592046 makes ComponentTreeItemList::validate() report these violations itself.
+   * @todo Remove this workaround once #3592046 makes ComponentTreeItemList::validate() report these violations itself.
    *
    * @param string $componentId
    *   The component ID, used in violation messages.
