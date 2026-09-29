@@ -165,7 +165,6 @@ export const shouldSkipPropValidation = (
     }
   }
 
-
   // Object props (e.g. image) have a source shape that differs from
   // their resolved value, so they can't be validated client-side,
   // server-side validation still runs.
