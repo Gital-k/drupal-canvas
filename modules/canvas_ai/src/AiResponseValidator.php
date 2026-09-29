@@ -48,10 +48,9 @@ class AiResponseValidator {
     // Create a mapping of components to their original paths.
     $pathMapping = [];
     // Some violations are found outside of ComponentTreeItemList->validate():
-    // props that do not exist on their component, primitive-typed props
-    // given a value core's own type validation would reject, and values the
-    // component source dropped rather than stored. Collect them during
-    // conversion instead.
+    // props that do not exist on their component, and primitive-typed props
+    // given a value core's own type validation would reject. Collect them
+    // during conversion instead.
     $outOfBandViolations = new ConstraintViolationList();
 
     // Convert YAML structure to Canvas ComponentTreeItem format.
@@ -147,14 +146,6 @@ class AiResponseValidator {
             $clientModel['source'] = $propSources ?? [];
             $clientModel['resolved'] = $componentData['props'];
             $inputs = $component->getComponentSource()->clientModelToInput($componentUuid, $component, $clientModel, NULL);
-            $this->collectUnstorableValueViolations(
-              $componentId,
-              $componentData['props'],
-              $propSources,
-              $inputs,
-              $componentPath,
-              $outOfBandViolations
-            );
           }
         }
 
@@ -263,6 +254,8 @@ class AiResponseValidator {
   /**
    * Collects violations for wrongly typed boolean, integer and number props.
    *
+   * @todo Remove this workaround once https://git.drupalcode.org/project/canvas/-/work_items/3592046 makes ComponentTreeItemList::validate() report these violations itself.
+   *
    * @param string $componentId
    *   The component ID, used in violation messages.
    * @param array $props
@@ -296,44 +289,6 @@ class AiResponseValidator {
       $this->addGarbageInputViolation(
         $violations,
         \sprintf('Component `%s`: the `%s` prop value %s cannot be stored: %s.', $componentId, $propName, \json_encode($propValue), $expectation),
-        \sprintf('%s.props.%s', $componentPath, $propName),
-        $propValue,
-      );
-    }
-  }
-
-  /**
-   * Collects violations for supplied values the component source dropped.
-   *
-   * @param string $componentId
-   *   The component ID.
-   * @param array $props
-   *   The AI-supplied props.
-   * @param array|null $propSources
-   *   The component's defined prop sources, or NULL for sources that are not
-   *   prop-based (e.g. block components).
-   * @param array $inputs
-   *   The inputs `clientModelToInput()` produced from those props.
-   * @param string $componentPath
-   *   The component path, used to build the violation property path.
-   * @param \Symfony\Component\Validator\ConstraintViolationList $violations
-   *   The list to add violations to.
-   */
-  private function collectUnstorableValueViolations(string $componentId, array $props, ?array $propSources, array $inputs, string $componentPath, ConstraintViolationList $violations): void {
-    if ($propSources === NULL) {
-      return;
-    }
-    foreach ($props as $propName => $propValue) {
-      if (!isset($propSources[$propName]) || \array_key_exists($propName, $inputs)) {
-        continue;
-      }
-      $storage = $propSources[$propName]['sourceTypeSettings']['storage']['target_type'] ?? NULL;
-      $hint = \is_string($storage)
-        ? \sprintf('This prop stores a reference to a %s entity: give the ID of an existing one, or copy the default image object exactly as the component details give it.', $storage)
-        : 'Give a non-empty value of the type the component details describe, or omit the prop.';
-      $this->addGarbageInputViolation(
-        $violations,
-        \sprintf('Component `%s`: the value given for the `%s` prop cannot be stored. %s', $componentId, $propName, $hint),
         \sprintf('%s.props.%s', $componentPath, $propName),
         $propValue,
       );

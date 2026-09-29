@@ -221,39 +221,6 @@ final class EditComponentsTest extends CanvasKernelTestBase {
   }
 
   /**
-   * Tests that an edit giving a media-bound prop a partial object is rejected.
-   *
-   * The frontend strips a value it cannot store from a media-bound prop and
-   * falls back to the component's default image, so without this check the
-   * edit would validate while the model believes it supplied an image.
-   *
-   * @see \Drupal\canvas_ai\AiResponseValidator::collectUnstorableValueViolations()
-   */
-  public function testUnstorableImageValueIsReported(): void {
-    $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
-    $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, json_encode([
-      'regions' => [
-        'content' => [
-          'nodePathPrefix' => [0],
-          'components' => [
-            [
-              'name' => 'sdc.canvas_test_sdc.image',
-              'uuid' => '9f5c5f21-2b0a-4a6e-9c2f-0d6f2a7c1e11',
-              'props' => [],
-            ],
-          ],
-        ],
-      ],
-    ], JSON_THROW_ON_ERROR));
-
-    $edits = [['component_uuid' => '9f5c5f21-2b0a-4a6e-9c2f-0d6f2a7c1e11', 'props' => "image:\n  src: \"https://example.com/hero.jpg\"\n  alt: \"Hero\""]];
-    $result = $this->getToolOutput('canvas_ai:edit_components', ['component_edits' => $edits]);
-    $normalized = self::normalizeErrorString($result);
-    $this->assertStringStartsWith('Failed to edit components: Component validation errors:', $normalized);
-    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.image].props.image: Component `sdc.canvas_test_sdc.image`: the value given for the `image` prop cannot be stored. Give a non-empty value of the type the component details describe, or omit the prop.', $normalized);
-  }
-
-  /**
    * Tests that an invalid boolean or integer prop value is rejected.
    *
    * `BooleanData::getCastedValue()` casts any non-empty string to `TRUE`,
