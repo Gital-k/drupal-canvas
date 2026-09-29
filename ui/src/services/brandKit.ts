@@ -1,14 +1,22 @@
 import { v4 as uuidv4 } from 'uuid';
 import { createApi } from '@reduxjs/toolkit/query/react';
 
+
+
 import { BRAND_KIT_ID } from '@/features/brandKit/constants';
 import { setUpdatePreview } from '@/features/layout/layoutModelSlice';
 import { baseQueryWithAutoSaves } from '@/services/baseQuery';
 import { pendingChangesApi } from '@/services/pendingChangesApi';
 import { handleAutoSavesHashUpdate } from '@/utils/autoSaves';
 
+
+
 import type { AutoSavesHash } from '@/types/AutoSaves';
 import type { BrandKit, BrandKitColor } from '@/types/CodeComponent';
+
+
+
+
 
 export interface UploadedArtifact {
   fid: number;
@@ -29,11 +37,11 @@ const patchColors = (mutate: (colors: BrandKitColor[]) => void) =>
   });
 
 /**
- * The newest in-flight write token per color id.
+ * Tracks the latest pending write per color id.
  *
- * A rejected write must not roll back a newer write to the same color that has
- * already been applied optimistically. Each write records a token here and
- * only undoes its patch while it is still the newest.
+ * If an older write fails after a newer optimistic write has already run, it
+ * must not undo the newer result. Each write stores a token here and only
+ * rolls back its patch if it is still the latest token for that color.
  */
 const latestColorWrites = new Map<string, symbol>();
 

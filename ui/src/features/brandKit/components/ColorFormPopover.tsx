@@ -234,12 +234,21 @@ const ColorFormPopover = ({
   // the entered values and the error instead of starting over.
   const isRetryRef = useRef(false);
   const isOpenedRef = useRef(false);
+  // Mark closes triggered by Save so we don't treat them like user dismissals.
+  const isSavingCloseRef = useRef(false);
 
   // Initialize once per open cycle so optimistic cache updates do not
   // overwrite retry values after a failed save.
   useEffect(() => {
     if (!open) {
       isOpenedRef.current = false;
+      // If the user truly closes the popover, clear any old mutation state so
+      // the next open starts clean.
+      if (!isSavingCloseRef.current) {
+        resetCreate();
+        resetUpdate();
+      }
+      isSavingCloseRef.current = false;
       return;
     }
     if (isOpenedRef.current) {
@@ -303,8 +312,9 @@ const ColorFormPopover = ({
 
     const cssVariable = `--${variableName.startsWith('--') ? variableName.slice(2) : variableName}`;
 
-    // Close immediately because optimistic updates already changed the list;
-    // failed saves reopen with the same values and error.
+    // Close right away because the optimistic update already updated the list.
+    // Mark this as a save-driven close so we keep the current request state;
+    isSavingCloseRef.current = true;
     onOpenChange(false);
 
     try {
