@@ -387,3 +387,35 @@ function canvas_ai_post_update_0013_delete_page_variant_settings(): void {
   \Drupal::configFactory()->reset('canvas_ai.page_variant.settings');
   \Drupal::service(RouteBuilderInterface::class)->rebuild();
 }
+
+/**
+ * Reimport orchestrator agent for content-only / page-variant chrome routing.
+ *
+ * After page variants supply site chrome, the orchestrator must not route
+ * "add a header/footer" requests to the page or template builders as if those
+ * agents place chrome. Only the system prompt changed.
+ *
+ * Sites that update past 0011 in the same run already receive this prompt
+ * from 0011, which re-imports every agent's system prompt; writing it again
+ * here is harmless. Sites that ran 0011 before the prompt changed get it here.
+ *
+ * Updates 0012 and 0013 rewrite the page and template builder prompts and
+ * drop the page variant settings; neither touches the orchestrator, so this
+ * update only has to write the orchestrator prompt again.
+ *
+ * @see https://git.drupalcode.org/project/canvas/-/work_items/3592060
+ */
+function canvas_ai_post_update_0014_reimport_orchestrator_content_only_chrome(): void {
+  $module_path = \Drupal::service(ModuleExtensionList::class)->getPath('canvas_ai');
+  $source = new FileStorage($module_path . '/config/install');
+  $data = $source->read('ai_agents.ai_agent.canvas_ai_orchestrator');
+  $config = \Drupal::configFactory()->getEditable('ai_agents.ai_agent.canvas_ai_orchestrator');
+  if ($data && !$config->isNew()) {
+    // Only the system prompt changed. Set just that key so the per-site uuid,
+    // _core hash, and any other fields stay intact.
+    $config->set('system_prompt', $data['system_prompt'])->save(TRUE);
+
+    $message = 'The Canvas AI orchestrator agent system prompt has been updated. If you had customized it directly, those changes have been overwritten. The recommended way to extend or alter agent behavior is through the Context Control Center or custom event subscribers.';
+    \Drupal::logger('canvas_ai')->warning($message);
+  }
+}
