@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\canvas;
 
 use Drupal\canvas\Attribute\ComponentPreSaveUpdate;
+use Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
 use Drupal\canvas\Entity\Component;
@@ -114,6 +115,35 @@ class CanvasConfigUpdater {
       }
     }
     return $changed;
+  }
+
+  /**
+   * Escapes a code component's stored `meta:enum` keys.
+   *
+   * Code components now store `meta:enum` keys escaped, so that an `enum` value
+   * containing a dot — which a config key cannot — remains storable. Keys
+   * written before that escaping existed are unescaped, so any `%` in one is
+   * read as the start of an escape sequence and the label it keys is no longer
+   * found. Escaping them once makes every stored key a canonical escaped form.
+   *
+   * ⚠️ This MUST NOT be called from ::updateJavaScriptComponent(), which runs
+   * on every save: escaping is not idempotent, so a second pass would escape
+   * the escape sequences the first one wrote.
+   *
+   * @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
+   * @see canvas_post_update_0031_escape_code_component_meta_enum_keys()
+   *
+   * @return bool
+   *   TRUE if any key changed, FALSE otherwise.
+   */
+  public static function updateJavaScriptComponentMetaEnumKeys(JavaScriptComponent $javaScriptComponent): bool {
+    $props = $javaScriptComponent->getProps() ?? [];
+    $escaped_props = MetaEnumConfigKeyEscaper::escape($props);
+    if ($escaped_props === $props) {
+      return FALSE;
+    }
+    $javaScriptComponent->setProps($escaped_props);
+    return TRUE;
   }
 
   /**

@@ -240,6 +240,76 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
     $this->assertSame($expected, $this->entity->get('props')['tested_enum_prop']['examples']);
   }
 
+  /**
+   * Tests enum values containing a character a config key cannot contain.
+   *
+   * A prop's `enum` values double as the keys of its `meta:enum` labels, and a
+   * config key cannot contain a dot — so a code component storing such a label
+   * map must escape those keys. That escaping is private to how config stores a
+   * code component: per ADR #5, the client sends and receives the `enum` values
+   * the component developer wrote.
+   *
+   * @see https://www.drupal.org/i/3553605
+   * @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
+   */
+  public function testEnumValuesRequiringEscapedConfigKeys(): void {
+    \assert($this->entity instanceof JavaScriptComponent);
+    $meta_enum = [
+      // The reported case: a dot is the one character a config key cannot hold.
+      '3.14' => 'Pi',
+      // A colon needs no escaping — `meta:enum` is itself a config key.
+      '2:45pm' => 'Quarter to three',
+      // An enum value that already looks like an escape sequence must survive
+      // the round-trip too, rather than being read back as `.`.
+      '%2E' => 'Not a dot',
+      'plain' => 'Plain',
+    ];
+    $props = [
+      'tested_enum_prop' => [
+        'type' => 'string',
+        'title' => 'enum: string',
+        'enum' => \array_keys($meta_enum),
+        'meta:enum' => $meta_enum,
+        'examples' => ['plain'],
+      ],
+    ];
+
+    // The client sends each `enum` value as the `meta:enum` key labeling it.
+    $client_values = $this->entity->normalizeForClientSide()->values;
+    $client_values['props'] = $props;
+    // @see \Drupal\canvas\Plugin\Validation\Constraint\ImportedJsComponentsRequiredConstraint
+    $client_values['importedJsComponents'] = [];
+    $this->entity->updateFromClientSide($client_values);
+    $this->assertValidationErrors([]);
+    $this->entity->save();
+
+    // Config holds keys it can actually store.
+    $this->assertSame([
+      '3%2E14' => 'Pi',
+      '2:45pm' => 'Quarter to three',
+      '%252E' => 'Not a dot',
+      'plain' => 'Plain',
+    ], $this->config('canvas.js_component.test')->get('props.tested_enum_prop.meta:enum'));
+
+    // The client gets back the `enum` values it sent, before and after reloading
+    // from that config. (Only their order within the prop's schema differs: the
+    // config system orders a mapping's keys as its config schema lists them.)
+    $saved = $this->entity;
+    \assert($saved instanceof JavaScriptComponent);
+    $reloaded = JavaScriptComponent::load('test');
+    \assert($reloaded instanceof JavaScriptComponent);
+    foreach ([$saved, $reloaded] as $entity) {
+      $client_prop = $entity->normalizeForClientSide()->values['props']['tested_enum_prop'];
+      $this->assertSame($meta_enum, $client_prop['meta:enum']);
+      $this->assertSame(\array_keys($meta_enum), $client_prop['enum']);
+      $this->assertEquals($props['tested_enum_prop'], $client_prop);
+    }
+
+    // So does every other consumer of the prop schemas: they all read them
+    // through the projected SDC definition.
+    $this->assertSame($meta_enum, $reloaded->toSdcDefinition()['props']['properties']['tested_enum_prop']['meta:enum']);
+  }
+
   #[DataProvider('providerInvalidEnumsAndExamples')]
   public function testInvalidEnumsAndExamples(string $json_schema_type, array $enum_and_examples_both, ?array $meta_enum, array $indexed_validation_errors, array $expected_validation_errors): void {
     $this->entity->set('props', [
@@ -291,14 +361,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         ['string', 42, 3.14, NULL],
         NULL,
         ['3' => 'This value should not be null.'],
-        [
-          '' => [
-            // If not meta:enums are specified, they are generated, but number ones
-            // with decimals will be invalid.
-            'The "meta:enum" keys for the "tested_enum_prop" prop enum cannot contain a dot. Offending key: "3.14"',
-            'The values for the "tested_enum_prop" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-          ],
-        ],
+        [],
       ],
       'Invalid integer' => [
         'integer',
@@ -310,11 +373,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
           '3' => 'This value should not be null.',
         ],
         [
-          '' => [
-            'Prop "tested_enum_prop" has invalid example value: [] String value found, but an integer or an object is required',
-            'The "meta:enum" keys for the "tested_enum_prop" prop enum cannot contain a dot. Offending key: "3.14"',
-            'The values for the "tested_enum_prop" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-          ],
+          '' => 'Prop "tested_enum_prop" has invalid example value: [] String value found, but an integer or an object is required',
         ],
       ],
       // ⚠️ For now, Canvas does not support `enum` on `type: number` to match core and for better usability.
@@ -325,10 +384,6 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         NULL,
         [],
         [
-          '' => [
-            'The "meta:enum" keys for the "tested_enum_prop" prop enum cannot contain a dot. Offending key: "3.14"',
-            'The values for the "tested_enum_prop" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-          ],
           'props.tested_enum_prop' => "'enum' is an unknown key because props.tested_enum_prop.type is number (see config schema type canvas.json_schema.prop.*||canvas.json_schema.prop_shape.number).",
         ],
       ],
@@ -338,11 +393,7 @@ class JavaScriptComponentValidationTest extends BetterConfigEntityValidationTest
         NULL,
         [],
         [
-          '' => [
-            'Prop "tested_enum_prop" has invalid example value: [] String value found, but a number or an object is required',
-            'The "meta:enum" keys for the "tested_enum_prop" prop enum cannot contain a dot. Offending key: "3.14"',
-            'The values for the "tested_enum_prop" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-          ],
+          '' => 'Prop "tested_enum_prop" has invalid example value: [] String value found, but a number or an object is required',
           'props.tested_enum_prop' => "'enum' is an unknown key because props.tested_enum_prop.type is number (see config schema type canvas.json_schema.prop.*||canvas.json_schema.prop_shape.number).",
           'props.tested_enum_prop.examples.0' => 'This value should be of the correct primitive type.',
           'props.tested_enum_prop.examples.3' => 'This value should not be null.',

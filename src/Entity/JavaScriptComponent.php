@@ -8,6 +8,7 @@ use Drupal\canvas\AutoSave\AutoSaveManager;
 use Drupal\canvas\AutoSaveEntity;
 use Drupal\canvas\CanvasUriDefinitions;
 use Drupal\canvas\ClientSideRepresentation;
+use Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentMetadataRequirementsChecker;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -372,6 +373,15 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     if (isset($data['dataDependencies']) && \is_array($data['dataDependencies'])) {
       $data['dataDependencies'] = self::coalesceEntityFields($data['dataDependencies']);
     }
+    // The client labels each `enum` value by using it as a `meta:enum` key, but
+    // a config key cannot contain a dot. Escape those keys here, the one place
+    // where prop schemas arrive from outside config, so that the client needs
+    // no understanding of how config stores them, per ADR #5.
+    // @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
+    // @see ::toSdcDefinition()
+    if (isset($data['props']) && \is_array($data['props'])) {
+      $data['props'] = MetaEnumConfigKeyEscaper::escape($data['props']);
+    }
     foreach (array_intersect_key($data, array_flip([
       'machineName',
       'name',
@@ -622,7 +632,15 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       'name' => (string) $this->label(),
       'props' => [
         'type' => 'object',
-        'properties' => $this->props ?? [],
+        // Unescape the `meta:enum` keys that ::updateFromClientSide() escaped
+        // to make them storable as config keys. Every consumer of a code
+        // component's prop schemas — the client, the component instance form,
+        // rendering, prop shape matching — reads them through this projected
+        // SDC definition, and so sees the `enum` values the component
+        // developer wrote.
+        // @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
+        // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsComponentDiscovery::buildEphemeralSdcPluginInstance()
+        'properties' => MetaEnumConfigKeyEscaper::unescape($this->props ?? []),
       ],
       // No equivalents exist nor can be generated; specify hard-coded values
       // that allow this to be considered a valid SDC definition.
@@ -748,9 +766,6 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
 
     // Per-prop checks specific to code components.
     foreach ($metadata->schema['properties'] ?? [] as $prop_name => $prop) {
-      // Code component metadata is persisted as a Drupal config entity, so
-      // `meta:enum` keys cannot contain dots.
-      // @see \Drupal\Core\Config\ConfigBase::validateKeys()
       array_push($messages, ...self::checkPropMetaEnumKeys($prop_name, $prop));
 
       // Image src in any example must satisfy JsComponent's runtime URL
@@ -771,15 +786,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   }
 
   /**
-   * Validates `meta:enum` keys for a prop against config storage constraints.
+   * Validates that a prop's `meta:enum` labels every one of its `enum` values.
+   *
+   * ⚠️ A `meta:enum` key may contain any character an `enum` value may, dots
+   * included: they are escaped before being stored as config keys.
    *
    * @param string $prop_name
    *   Prop name (for error messages).
    * @param array<string, mixed> $prop
-   *   The prop's JSON Schema.
+   *   The prop's JSON Schema, with unescaped `meta:enum` keys.
    *
    * @return list<string>
    *   Error messages, or an empty list if no issues found.
+   *
+   * @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
    */
   private static function checkPropMetaEnumKeys(string $prop_name, array $prop): array {
     $enum_container = \in_array('array', (array) ($prop['type'] ?? []), TRUE)
@@ -789,13 +809,8 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       return [];
     }
     $messages = [];
-    foreach (\array_keys($enum_container['meta:enum']) as $meta_key) {
-      if (\str_contains((string) $meta_key, '.')) {
-        $messages[] = \sprintf('The "meta:enum" keys for the "%s" prop enum cannot contain a dot. Offending key: "%s"', $prop_name, $meta_key);
-      }
-    }
     $expected_keys = \array_map(
-      static fn($value): string => \str_replace('.', '_', (string) $value),
+      static fn($value): string => (string) $value,
       $enum_container['enum'],
     );
     $missing_keys = \array_diff($expected_keys, \array_keys($enum_container['meta:enum']));
@@ -833,8 +848,16 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   /**
    * Sets value for props.
    *
+   * ⚠️ Prop schemas are stored as config, whose keys cannot contain a dot, so
+   * this expects `meta:enum` keys in their escaped form — as ::getProps() and
+   * ::toArray() return them. A schema from any other origin (an SDC's metadata,
+   * an AI agent, a test fixture) must be escaped first. Prop schemas sent by
+   * the client are escaped by ::updateFromClientSide() already.
+   *
    * @param array<string, JsonSchema> $props
-   *   Value for Props.
+   *   Value for Props, with escaped `meta:enum` keys.
+   *
+   * @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
    */
   public function setProps(array $props): self {
     $this->props = $props;
@@ -880,8 +903,13 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
   /**
    * Gets component props.
    *
+   * ⚠️ `meta:enum` keys are returned in their escaped form, as config stores
+   * them. Use ::toSdcDefinition() to read the `enum` values they label.
+   *
    * @return array|null
-   *   Component props.
+   *   Component props, with escaped `meta:enum` keys.
+   *
+   * @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
    */
   public function getProps(): ?array {
     return $this->props;
