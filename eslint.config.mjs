@@ -57,6 +57,7 @@ const isolatedPerTestPlugin = {
 };
 
 // Number of test cases each existing Cypress spec had when this rule was added. Do not raise.
+// cspell:ignore autosave
 const cypressTestBaseline = {
   'ui/tests/e2e/auto-path-alias.cy.js': 4,
   'ui/tests/e2e/autocomplete-props.cy.js': 3,
