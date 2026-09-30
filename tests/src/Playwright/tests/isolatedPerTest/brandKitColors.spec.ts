@@ -941,9 +941,8 @@ test.describe('brand kit colors', () => {
     await page.locator(SEL.form.rgba.b).fill('255');
     await page.locator(SEL.form.save).click();
 
-    // The row swatch shows the new color while the request is still open, and
-    // the form has already closed. This is the whole point of the optimistic
-    // write: nothing waits for the server.
+    // This verifies the optimistic UI update by checking that the new color
+    // is applied and the form is closed before the server responds.
     await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
     await expect(page.locator(POP_SEL)).toBeHidden();
 
@@ -951,9 +950,8 @@ test.describe('brand kit colors', () => {
     await expect(redSwatch).toHaveCSS('background-color', 'rgb(0, 0, 255)');
   });
 
-  // A single scenario covers the held create and the rejected edit: the
-  // site install in the setup dominates the run time, so the two flows share
-  // one, without weakening what either asserts.
+  // This scenario verifies an in-flight color creation followed by a
+  // rejected edit.
   test('shows a new color before the create completes and rolls back a rejected edit', async ({
     page,
     drupal,
@@ -963,7 +961,7 @@ test.describe('brand kit colors', () => {
     await canvas.openCanvasRoot();
     await canvas.openBrandKitPanel();
 
-    // Hold the write open so the assertions below land while it is in flight.
+    // Delay the network response to run assertions while the save is pending.
     let releaseWrite: () => void = () => {};
     const writeHeld = new Promise<void>((resolve) => {
       releaseWrite = resolve;
@@ -994,8 +992,7 @@ test.describe('brand kit colors', () => {
     );
     await expect(page.locator(POP_SEL)).toBeHidden();
 
-    // Let the create and the reconcile refetch it triggers settle, so the
-    // list is not re-rendering under the second flow's clicks.
+    // Wait for the list data to refresh before proceeding.
     const reconciled = page.waitForResponse(
       (response) =>
         response.request().method() === 'GET' &&
@@ -1005,10 +1002,9 @@ test.describe('brand kit colors', () => {
     await reconciled;
     await expect(page.locator(SEL.row('Impatient Amber'))).toBeVisible();
 
-    // Second flow: a rejected edit rolls back.
-    // Capture the stored color rather than hard-coding the hsl() conversion,
-    // so this asserts "restored to what it was" without depending on how the
-    // browser rounds the components.
+    // Use case: Assert that a rejected edit rolls back.
+    // We capture the initial computed color to verify the exact restoration
+    // without failing on browser-specific HSL rounding quirks.
     const greenSwatch = page.locator(SEL.rowSwatch('Brand Green'));
     const storedGreen = await greenSwatch.evaluate(
       (element) => getComputedStyle(element).backgroundColor,
