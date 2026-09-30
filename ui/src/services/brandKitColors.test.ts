@@ -100,26 +100,20 @@ afterEach(() => {
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /**
- * Builds a store subscribed to the Brand kit query, seeded from the fake
- * server. The live subscription keeps the cache entry from being evicted when
- * the mutation invalidates it.
+ * Initializes the test store with the given colors and an active Brand kit subscription.
  */
 const setup = async (colors: BrandKitColor[]) => {
   serverColors = colors;
   const store = configureStore({
     reducer: {
       [brandKitApi.reducerPath]: brandKitApi.reducer,
-      // The base query reads `state.configuration` for the base URL. Color
-      // mutations are excluded from auto-save injection, so no other slice is
-      // needed here.
       configuration: () => ({ baseUrl: 'http://localhost/' }),
     },
     middleware: (getDefaultMiddleware) =>
       getDefaultMiddleware().concat(brandKitApi.middleware),
   });
 
-  // Await the initial load: if it were still in flight it would land on top of
-  // the optimistic patch and silently overwrite it.
+  // Ensure the initial data load finishes before returning the store.
   await store.dispatch(
     brandKitApi.endpoints.getBrandKit.initiate(BRAND_KIT_ID),
   );
@@ -136,9 +130,8 @@ const setup = async (colors: BrandKitColor[]) => {
       .select(BRAND_KIT_ID)(store.getState())
       .data?.data.colors?.find((color) => color.id === id)?.value.hex;
 
-  // Deliberately not async: returning the mutation promise from an async
-  // helper would make `await editColor(...)` wait on a request the test has
-  // not settled yet. Callers await `flush()` themselves.
+  // Initiates the edit synchronously so tests can assert the immediate UI
+  // updates. Callers should await flush() to complete the request.
   const editColor = (id: string, hex: string) =>
     store.dispatch(
       brandKitApi.endpoints.updateColor.initiate({
@@ -153,8 +146,7 @@ const setup = async (colors: BrandKitColor[]) => {
       .select(BRAND_KIT_ID)(store.getState())
       .data?.colors?.find((color) => color.id === id)?.name;
 
-  // A distinct caller from `editColor`: writes the name instead of the value,
-  // the way ColorRow's rename field does, independently of the hex popover.
+  // Updates only the color name independently of its hex value.
   const renameColor = (id: string, name: string) =>
     store.dispatch(
       brandKitApi.endpoints.updateColor.initiate({ id, changes: { name } }),
@@ -252,9 +244,8 @@ describe('brand kit color optimistic edits', () => {
   });
 
   it('ignores an auto-save response that lands mid-write', async () => {
-    // Hold the auto-save read open so it resolves *after* the optimistic patch,
-    // carrying pre-edit colors. Were the draft a color source, this response
-    // would revert the swatch to the old color.
+    // Hold the auto-save response so it lands after the optimistic patch, so we
+    // can confirm the stale draft data doesn't revert the UI.
     let releaseAutoSave: () => void = () => {};
     heldAutoSave = new Promise<void>((resolve) => {
       releaseAutoSave = resolve;
@@ -273,9 +264,9 @@ describe('brand kit color optimistic edits', () => {
     releaseAutoSave();
     await flush();
 
-    // The draft did land, and it does carry the pre-edit color.
+    // Verify that the UI ignores the outdated auto-save draft and continues
+    // reading the optimistic patch.
     expect(readDraftHex('a')).toBe('#ff0000');
-    // It is not what the colors UI reads.
     expect(readHex('a')).toBe('#00ff00');
 
     releaseWrite(200);
@@ -285,7 +276,7 @@ describe('brand kit color optimistic edits', () => {
   it('does not roll back a newer edit when an older write is rejected', async () => {
     const { readHex, editColor } = await setup([makeColor('a', '#ff0000')]);
 
-    // Dispatch two edits before either settles; capture both release handles.
+    // Dispatch two edits before either completes; capture both release handles.
     const edit1 = editColor('a', '#0000ff'); // blue
     await flush();
     const releaseEdit1 = releaseWrite; // captured before edit2 overwrites it
@@ -311,8 +302,7 @@ describe('brand kit color optimistic edits', () => {
   });
 
   it('rolls back both edits when two writes to different fields on the same color are both rejected', async () => {
-    // Distinct callers — the hex popover and the row's rename field — writing
-    // to the same color id, each guarded by the "newest write" token.
+    // Set up two concurrent edits targeting different fields on the same color.
     const { readHex, readName, editColor, renameColor } = await setup([
       makeColor('a', '#ff0000'),
     ]);
@@ -329,15 +319,13 @@ describe('brand kit color optimistic edits', () => {
     expect(readHex('a')).toBe('#0000ff');
     expect(readName('a')).toBe('Renamed');
 
-    // The older write (hex) is rejected first; its own guard skips the undo
-    // since the rename now holds the newest token.
+    // Reject the earlier hex edit while the newer rename is still pending.
     releaseEdit(422);
     await edit;
     await flush();
 
-    // The newer write (rename) is rejected too. This asserts that its cache
-    // rollback clears both the name it patched and the earlier, 
-    // already-rejected hex change.
+    // Reject the concurrent rename and assert that both failed edits are fully
+    // reverted.
     releaseRename(422);
     await rename;
     await flush();
