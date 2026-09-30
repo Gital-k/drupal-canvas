@@ -46,6 +46,9 @@
           {% if prop_link_data %}
             direct_linker_data="{{ prop_link_data }}"
           {% endif  %}
+          {% if required %}
+            required="true"
+          {% endif  %}
       >
       </canvas-drupal-label>
     </legend>
