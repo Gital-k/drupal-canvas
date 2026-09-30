@@ -5,6 +5,7 @@
   "schedule": ["before 6am on Monday"],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 2,
+  "postUpdateOptions": ["npmDedupe"],
   "vulnerabilityAlerts": {
     "minimumReleaseAge": "0 days"
   },
