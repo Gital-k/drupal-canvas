@@ -11,6 +11,7 @@ use Drupal\canvas\Controller\ApiContentControllers;
 use Drupal\canvas\Entity\Page;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityPublishedInterface;
+use Drupal\Core\Url;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -593,6 +594,33 @@ class ApiContentControllersListTest extends CanvasKernelTestBase {
     ];
     $actual_cache_tags = $cache_metadata->getCacheTags();
     self::assertEquals($expected_cache_tags, $actual_cache_tags, 'Cache tags should match');
+  }
+
+  /**
+   * Tests operations provided by hook_canvas_content_operation().
+   *
+   * @legacy-covers ::getEntityOperations
+   */
+  public function testModuleProvidedOperations(): void {
+    $page = $this->pages['published'];
+
+    $item = $this->executeListRequest()[(int) $page->id()];
+    self::assertArrayNotHasKey('canvas_test_page_view', $item['links']);
+    self::assertArrayNotHasKey('linkLabels', $item);
+
+    $this->container->get('state')->set('canvas_test_page.content_operations', TRUE);
+    $item = $this->executeListRequest()[(int) $page->id()];
+
+    // Only those the current user can access, with their labels in weight
+    // order.
+    self::assertEquals([
+      'canvas_test_page_front' => Url::fromRoute('<front>')->toString(),
+      'canvas_test_page_view' => $page->toUrl()->toString(),
+    ], \array_filter($item['links'], static fn(string $rel): bool => \str_starts_with($rel, 'canvas_test_page_'), \ARRAY_FILTER_USE_KEY));
+    self::assertSame([
+      'canvas_test_page_view' => 'View on site',
+      'canvas_test_page_front' => 'Front page',
+    ], $item['linkLabels']);
   }
 
 }

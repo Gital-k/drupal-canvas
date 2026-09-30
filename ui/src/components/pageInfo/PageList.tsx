@@ -24,6 +24,7 @@ import ErrorCard from '@/components/error/ErrorCard';
 import InfiniteScrollObserver from '@/components/InfiniteScrollObserver';
 import SidebarNode from '@/components/sidePanel/SidebarNode';
 import UnifiedMenu from '@/components/UnifiedMenu';
+import { getModuleOperations } from '@/utils/contentOperations';
 
 import type { FormEvent } from 'react';
 import type { ContentStub } from '@/types/Content';
@@ -75,6 +76,7 @@ const createPageMenuContent = (
   const hasUnpublish = hasPermission('unpublish', item);
   const hasPublish = hasPermission('publish', item);
   const hasDelete = hasPermission('delete', item);
+  const moduleOperations = getModuleOperations(item);
 
   // If no permissions, don't render dropdown
   if (
@@ -82,7 +84,8 @@ const createPageMenuContent = (
     !hasHomepage &&
     !hasUnpublish &&
     !hasPublish &&
-    !hasDelete
+    !hasDelete &&
+    !moduleOperations.length
   ) {
     return null;
   }
@@ -134,11 +137,29 @@ const createPageMenuContent = (
           </UnifiedMenu.Item>
         </>
       )}
-      {hasDelete && (
+      {moduleOperations.length > 0 && (
         <>
           {(hasDuplicate || hasHomepage || hasUnpublish || hasPublish) && (
             <UnifiedMenu.Separator />
           )}
+          {moduleOperations.map(({ rel, href, label }) => (
+            <UnifiedMenu.Item
+              key={rel}
+              asChild
+              onClick={(event) => event.stopPropagation()}
+            >
+              <a href={href}>{label}</a>
+            </UnifiedMenu.Item>
+          ))}
+        </>
+      )}
+      {hasDelete && (
+        <>
+          {(hasDuplicate ||
+            hasHomepage ||
+            hasUnpublish ||
+            hasPublish ||
+            moduleOperations.length > 0) && <UnifiedMenu.Separator />}
           <AlertDialog.Root>
             <AlertDialog.Trigger>
               <UnifiedMenu.Item
