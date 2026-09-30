@@ -89,7 +89,7 @@
     "@drupal-canvas/ui": {
       "react-dom": "^18.2.0"
     },
-    "js-yaml": "^4.2.0",
+    "js-yaml": "^5.0.0",
     "shell-quote": "^1.8.4"
   }
 }
