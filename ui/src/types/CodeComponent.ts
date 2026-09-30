@@ -118,6 +118,13 @@ export interface CodeComponentProp {
     >;
   };
   entityFieldExpressions?: string[];
+  // Ephemeral editor-only selection driving the in-editor preview for a
+  // `content-entity-reference` prop. Never persisted: excluded from
+  // serializeProps() and not part of CodeComponentPropSerialized.
+  previewEntity?: { entityTypeId: string; entityId: string } | null;
+  // The resolved payload for `previewEntity`, fed to the preview iframe.
+  // Never persisted; undefined while unresolved/loading.
+  previewResolvedValue?: Record<string, unknown> | null;
 }
 
 export interface CodeComponentPropImageExample {
@@ -208,6 +215,8 @@ export type CodeComponentPropPreviewValue =
   | CodeComponentPropVideoExample[]
   | CodeComponentPropDocumentExample[]
   | ResolvedColorProp
+  // The resolved content-entity-reference payload, or null when unset.
+  | Record<string, unknown>
   | null;
 
 export interface AssetLibrary {

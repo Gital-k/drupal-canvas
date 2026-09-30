@@ -526,4 +526,37 @@ final class ContentTemplateTest extends CanvasKernelTestBase {
     $this->assertContains('route.name.is_canvas_editor_ui', $build['#cache']['contexts']);
   }
 
+  /**
+   * @legacy-covers ::normalizeForClientSide
+   */
+  public function testNormalizeForClientSideDoesNotAddCacheContextsAsCacheTags(): void {
+    $this->installEntitySchema('user');
+    $this->installEntitySchema('node');
+
+    $node_type = \Drupal::entityTypeManager()->getDefinition('node');
+    \assert($node_type instanceof EntityTypeInterface);
+    $list_cache_contexts = $node_type->getListCacheContexts();
+    // Without this the rest of the test would pass vacuously.
+    self::assertNotEmpty($list_cache_contexts);
+
+    $template = ContentTemplate::create([
+      'id' => 'node.helpful.full',
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'helpful',
+      'content_entity_type_view_mode' => 'full',
+    ]);
+    $representation = $template->normalizeForClientSide();
+
+    // The entity type's list cache contexts must be cache contexts …
+    self::assertSame(
+      $list_cache_contexts,
+      \array_values(\array_intersect($list_cache_contexts, $representation->getCacheContexts())),
+    );
+    // … and must never be recorded as cache tags.
+    self::assertSame(
+      [],
+      \array_intersect($list_cache_contexts, $representation->getCacheTags()),
+    );
+  }
+
 }
