@@ -65,7 +65,7 @@
     "date-fns": "^4.1.0",
     "deep-chat-react": "^2.1.1",
     "dompurify": "^3.4.11",
-    "dotenv": "^16.4.5",
+    "dotenv": "^18.0.0",
     "html-react-parser": "^6.1.8",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",
