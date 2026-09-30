@@ -989,6 +989,15 @@ entity.canvas_page.add_page:
     _csrf_token: 'TRUE'
   options:
     _admin_route: TRUE
+entity.canvas_page.field_ui_settings:
+  path: '/admin/structure/canvas-page'
+  defaults:
+    _controller: '\Drupal\canvas\Controller\CanvasPageFieldUiController::overview'
+    _title: 'Canvas page'
+  requirements:
+    _permission: 'edit canvas_page'
+  options:
+    _admin_route: TRUE
 entity.component.audit:
   path: '/admin/appearance/component/{component}/audit'
   defaults:

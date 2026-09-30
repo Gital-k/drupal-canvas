@@ -75,6 +75,7 @@ use Drupal\views\EntityViewsData;
       "version-history" => "/page/{canvas_page}/revisions",
       "collection" => "/admin/content/pages",
     ],
+    field_ui_base_route: "entity.canvas_page.field_ui_settings",
     translatable: TRUE,
     entity_keys: [
       "id" => "id",
