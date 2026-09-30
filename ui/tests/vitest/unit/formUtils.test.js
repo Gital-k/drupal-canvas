@@ -837,4 +837,40 @@ describe('getCurrentValueFromProps', () => {
       }),
     ).to.equal('hello');
   });
+
+  it('should return every selected value for a multi-select', () => {
+    expect(
+      getCurrentValueFromProps({
+        attributes: { multiple: true },
+        options: [
+          { value: 'one', selected: true },
+          { value: 'two', selected: false },
+          { value: 'three', selected: true },
+        ],
+      }),
+    ).to.deep.equal(['one', 'three']);
+  });
+
+  it('should return an array for a multi-select with a single selected option', () => {
+    expect(
+      getCurrentValueFromProps({
+        attributes: { multiple: true },
+        options: [
+          { value: 'one', selected: true },
+          { value: 'two', selected: false },
+        ],
+      }),
+    ).to.deep.equal(['one']);
+  });
+
+  it('should return a scalar for a single-value select', () => {
+    expect(
+      getCurrentValueFromProps({
+        options: [
+          { value: 'one', selected: false },
+          { value: 'two', selected: true },
+        ],
+      }),
+    ).to.equal('two');
+  });
 });

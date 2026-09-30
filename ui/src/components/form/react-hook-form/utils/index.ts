@@ -53,6 +53,13 @@ export const dispatchFieldError = (
 
 export const getCurrentValueFromProps = (props: Record<string, any>) => {
   if (props.options && props.options.some((opt: any) => opt.selected)) {
+    // Extract and return an array of all selected option values for
+    // <select multiple> fields.
+    if (props.attributes?.multiple) {
+      return props.options
+        .filter((opt: any) => opt.selected)
+        .map((opt: any) => opt.value);
+    }
     return props.options.find((opt: any) => opt.selected).value;
   }
   if (props.attributes?.type === 'checkbox') {
