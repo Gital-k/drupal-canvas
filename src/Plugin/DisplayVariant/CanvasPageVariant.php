@@ -299,7 +299,8 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
    * The preview flag is passed to the component tree so component sources can
    * render their auto-saved drafts. Title and messages blocks receive their
    * page-level data. The "Page content" marker is replaced with the route's
-   * main content.
+   * main content, prefixed with the #main-content anchor the theme's skip link
+   * targets.
    *
    * @see \Drupal\Core\Display\PageVariantInterface
    * @see \Drupal\canvas\ComponentSource\ComponentSourceInterface::renderComponent()
@@ -320,8 +321,19 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
           $messages_block_displayed = TRUE;
           return $fiber->resume();
         })(),
-        // The "Page content" marker: inject the route's main content in place.
-        $component_instance instanceof Marker => $fiber->resume($main_content),
+        // The "Page content" marker: inject the route's main content in place,
+        // prefixed with the #main-content anchor.
+        // @see \Drupal\canvas\Plugin\Validation\Constraint\PageVariantHasContentMarkerConstraint
+        // @see core/modules/system/templates/html.html.twig
+        // @see core/modules/system/templates/page.html.twig
+        $component_instance instanceof Marker => $fiber->resume([
+          'main_content_anchor' => [
+            '#type' => 'html_tag',
+            '#tag' => 'a',
+            '#attributes' => ['id' => 'main-content', 'tabindex' => -1],
+          ],
+          'main_content' => $main_content,
+        ]),
         // If the fiber was suspended in some other context (e.g. while loading
         // entities) resume it to continue component tree rendering.
         default => $fiber->resume(),

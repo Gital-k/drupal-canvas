@@ -756,6 +756,13 @@ final class PageVariantTest extends CanvasKernelTestBase {
     self::assertInstanceOf(RendererInterface::class, $renderer);
     $html = (string) $renderer->renderInIsolation($build['#content']);
     self::assertStringContainsString($sentinel, $html);
+
+    // The #main-content anchor precedes the injected content, so the theme's
+    // "Skip to main content" link (in html.html.twig) has a valid target.
+    // @see core/modules/system/templates/html.html.twig
+    $anchor = '<a id="main-content" tabindex="-1"></a>';
+    self::assertStringContainsString($anchor, $html);
+    self::assertLessThan(\strpos($html, $sentinel), \strpos($html, $anchor));
   }
 
   /**
