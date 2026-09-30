@@ -1,11 +1,10 @@
 import addFormats from 'ajv-formats';
 import { createCanvasAjv } from '@drupal-canvas/json-schema-validation';
 
+import { isRemoveButtonEnabled } from '@/components/form/components/drupal/multivalueFormUtils';
 import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 import transforms from '@/utils/transforms';
-
-import { isRemoveButtonEnabled } from '@/components/form/components/drupal/multivalueFormUtils';
 
 import {
   getPropsValues,
