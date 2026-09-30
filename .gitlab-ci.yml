@@ -538,7 +538,7 @@ phpunit (11.3 mariadb):
     - *nightly-rule
     - *manual-rule
   services:
-    - mariadb:10.6
+    - mariadb:13.0
   variables:
     SIMPLETEST_DB: mysql://drupal:drupal@127.0.0.1/drupal
     MYSQL_DATABASE: drupal
