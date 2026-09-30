@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Functional;
 
-// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique Bonjour Traduit Gitane Drupalien Drupalienne
+// cspell:ignore Bienvenue savoir Découvrez Identité visuelle Charte graphique Bonjour Traduit Gitane tjid tuid
 
 use Behat\Mink\Element\NodeElement;
 use Drupal\canvas\Entity\Page;

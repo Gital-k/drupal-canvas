@@ -245,10 +245,10 @@ final readonly class TmgmtHooks {
    *
    * 2. Validation masking: LocalTaskItemForm::validateSaveAsComplete() reads
    *    $form_state->getValues()[$field_key]['translation'] and raises "Missing
-   *    translation." for any empty value. Unlike JobItemForm's validateJobItem()
-   *    (which reads $form[...]['#value']), this reads form state — so the mask
-   *    must temporarily set sentinel values in form state, not in $form. New
-   *    static callbacks maskEmptyLocalTaskTranslations() /
+   *    translation." for any empty value. Unlike JobItemForm's
+   *    validateJobItem() (which reads $form[...]['#value']), this reads form
+   *    state — so the mask must temporarily set sentinel values in form state,
+   *    not in $form. New static callbacks maskEmptyLocalTaskTranslations() /
    *    unmaskEmptyLocalTaskTranslations() handle this.
    *
    * @param array<string, mixed> $form
@@ -303,10 +303,11 @@ final readonly class TmgmtHooks {
     }
     $form_state->set('canvas_local_task_maskable_field_keys', $maskable_field_keys);
 
-    // validateSaveAsComplete() reads $form_state->getValues()[$key]['translation']
-    // and errors when it is empty. Mask empty optional-prop translations in
-    // form state before it runs; unmask after so a validation error from a
-    // required field never re-renders the sentinel in optional textareas.
+    // validateSaveAsComplete() reads
+    // $form_state->getValues()[$key]['translation'] and errors when it is
+    // empty. Mask empty optional-prop translations in form state before it
+    // runs; unmask after so a validation error from a required field never
+    // re-renders the sentinel in optional textareas.
     // @see \Drupal\tmgmt_local\Form\LocalTaskItemForm::actions()
     if (isset($form['actions']['save_as_completed']['#validate'])) {
       \array_unshift(
