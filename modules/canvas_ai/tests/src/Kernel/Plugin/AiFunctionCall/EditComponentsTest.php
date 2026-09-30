@@ -313,7 +313,7 @@ final class EditComponentsTest extends CanvasKernelTestBase {
       ],
       'unparseable_yaml' => [
         'edits' => [['component_uuid' => '72384115-a8ee-44bc-9a13-de1c7a4d9b96', 'props' => 'text: 2233-33-33']],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 1 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too.',
       ],
       'component_uuid_and_props_both_missing' => [
         'edits' => [[]],
@@ -368,7 +368,7 @@ final class EditComponentsTest extends CanvasKernelTestBase {
           ['component_uuid' => '43bb2ace-34cf-42d6-b43b-86d665309290', 'props' => 'nonexistent_prop: "value"'],
           ['component_uuid' => 'defd2f6c-f27d-422b-b397-b793df89d922', 'props' => 'text: "Does not matter"'],
         ],
-        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date at line 1 (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too. ## Edit 1 - Component validation errors: components.0.[sdc.canvas_test_sdc.my-hero].props.nonexistent_prop: Component `sdc.canvas_test_sdc.my-hero`: the `nonexistent_prop` prop is not defined. (code garbage) ## Edit 2 - Component defd2f6c-f27d-422b-b397-b793df89d922 was not found on the page.',
+        'expected_error' => 'Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - The props value is not valid YAML: The date "2233-33-33" could not be parsed as it is an invalid date (near "text: 2233-33-33"). Rewrite it with every string value quoted — unquoted dash-separated values such as 2233-33-33 are read as invalid dates, and HTML or multi-line text must be quoted too. ## Edit 1 - Component validation errors: components.0.[sdc.canvas_test_sdc.my-hero].props.nonexistent_prop: Component `sdc.canvas_test_sdc.my-hero`: the `nonexistent_prop` prop is not defined. (code garbage) ## Edit 2 - Component defd2f6c-f27d-422b-b397-b793df89d922 was not found on the page.',
       ],
     ];
   }
