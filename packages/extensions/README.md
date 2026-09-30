@@ -89,9 +89,9 @@ in the Drupal Canvas codebase.
 
 Canvas extensions run in iframes with
 `sandbox="allow-scripts allow-same-origin"` for dialog extensions and
-`sandbox="allow-scripts allow-same-origin allow-downloads"` for page extensions.
-Because `allow-same-origin` is enabled, this is not a strong security boundary
-for extension code.
+`sandbox="allow-scripts allow-same-origin allow-downloads allow-forms allow-popups allow-popups-to-escape-sandbox"`
+for page extensions. Because `allow-same-origin` is enabled, this is not a
+strong security boundary for extension code.
 
 Installing an extension currently means installing the Drupal module that
 provides it, so site owners should treat extensions as trusted code. This model
