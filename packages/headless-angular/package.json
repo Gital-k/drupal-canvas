@@ -42,7 +42,7 @@
     "@angular/core": "21.2.24",
     "@angular/platform-browser": "21.2.24",
     "@angular/router": "21.2.24",
-    "ng-packagr": "21.2.7",
+    "ng-packagr": "22.2.1",
     "typescript": "5.9.3"
   }
 }
