@@ -11,6 +11,7 @@ use Drupal\canvas\Tmgmt\ComponentInputsConfigProcessor;
 use Drupal\canvas\Tmgmt\ComponentInputsTranslatablesExtractor;
 use Drupal\canvas\Tmgmt\ComponentTreeFieldProcessor;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Entity\ContentEntityFormInterface;
 use Drupal\Core\Entity\EntityFormInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
@@ -21,6 +22,7 @@ use Drupal\Core\Render\Element;
 use Drupal\Core\StringTranslation\TranslatableMarkup;
 use Drupal\tmgmt\Data;
 use Drupal\tmgmt\JobItemInterface;
+use Drupal\tmgmt_local\Entity\LocalTaskItem;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -227,6 +229,145 @@ final readonly class TmgmtHooks {
   }
 
   /**
+   * Implements hook_form_tmgmt_local_task_item_edit_form_alter().
+   *
+   * The tmgmt_local LocalTaskItemForm is a parallel, self-contained form that
+   * has no hook extension points of its own (unlike JobItemForm, which fires
+   * hook_tmgmt_data_item_text_output_alter). This alter hook must therefore
+   * replicate both concerns that JobItemForm delegates to hooks and to
+   * formTmgmtJobItemEditFormAlter():
+   *
+   * 1. Sentinel display: LocalTaskItemForm::formElement() writes the raw
+   *    $data[$key]['#text'] directly into the source textarea's #value. If that
+   *    text is the ∅ sentinel (an empty source input), replace the textarea
+   *    with an explanatory message, exactly as formTmgmtJobItemEditFormAlter()
+   *    does for JobItemForm rows where the hook already blanked the source.
+   *
+   * 2. Validation masking: LocalTaskItemForm::validateSaveAsComplete() reads
+   *    $form_state->getValues()[$field_key]['translation'] and raises "Missing
+   *    translation." for any empty value. Unlike JobItemForm's validateJobItem()
+   *    (which reads $form[...]['#value']), this reads form state — so the mask
+   *    must temporarily set sentinel values in form state, not in $form. New
+   *    static callbacks maskEmptyLocalTaskTranslations() /
+   *    unmaskEmptyLocalTaskTranslations() handle this.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   *
+   * @see \Drupal\tmgmt_local\Form\LocalTaskItemForm::validateSaveAsComplete()
+   * @see \Drupal\canvas\Hook\TmgmtHooks::formTmgmtJobItemEditFormAlter()
+   */
+  #[Hook('form_tmgmt_local_task_item_edit_form_alter')]
+  public function formTmgmtLocalTaskItemEditFormAlter(array &$form, FormStateInterface $form_state): void {
+    $form_object = $form_state->getFormObject();
+    if (!$form_object instanceof ContentEntityFormInterface) {
+      return;
+    }
+    $task_item = $form_object->getEntity();
+    if (!$task_item instanceof LocalTaskItem) {
+      return;
+    }
+    $job_item = $task_item->getJobItem();
+    $entity = $this->getContentJobItemEntity($job_item);
+    if ($entity === NULL) {
+      return;
+    }
+    $field_name = $this->getCanvasFieldName($entity);
+    if ($field_name === NULL) {
+      return;
+    }
+
+    $row_paths = self::getLocalTaskItemRowPaths($form, $field_name);
+    if ($row_paths === []) {
+      return;
+    }
+
+    \assert($this->tmgmtData !== NULL);
+    $maskable_field_keys = [];
+    foreach ($row_paths as [$top_key, $field_key]) {
+      $row = &$form['translation'][$top_key][$field_key];
+
+      if (($row['source']['#value'] ?? '') === ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL) {
+        $row['source'] = [
+          '#type' => 'item',
+          '#markup' => new TranslatableMarkup('This field is empty in the source language.'),
+        ];
+      }
+
+      if (!self::rowIsRequiredProp($entity, $field_name, $field_key)) {
+        $maskable_field_keys[] = [$top_key, $field_key];
+      }
+      unset($row);
+    }
+    $form_state->set('canvas_local_task_maskable_field_keys', $maskable_field_keys);
+
+    // validateSaveAsComplete() reads $form_state->getValues()[$key]['translation']
+    // and errors when it is empty. Mask empty optional-prop translations in
+    // form state before it runs; unmask after so a validation error from a
+    // required field never re-renders the sentinel in optional textareas.
+    // @see \Drupal\tmgmt_local\Form\LocalTaskItemForm::actions()
+    if (isset($form['actions']['save_as_completed']['#validate'])) {
+      \array_unshift(
+        $form['actions']['save_as_completed']['#validate'],
+        [self::class, 'maskEmptyLocalTaskTranslations'],
+      );
+      $form['actions']['save_as_completed']['#validate'][] = [self::class, 'unmaskEmptyLocalTaskTranslations'];
+    }
+  }
+
+  /**
+   * Form validate callback: masks empty local-task translations in form state.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   *
+   * @see \Drupal\tmgmt_local\Form\LocalTaskItemForm::validateSaveAsComplete()
+   */
+  public static function maskEmptyLocalTaskTranslations(array &$form, FormStateInterface $form_state): void {
+    $masked = [];
+    foreach ($form_state->get('canvas_local_task_maskable_field_keys') ?? [] as [, $field_key]) {
+      $value = $form_state->getValue([$field_key, 'translation']);
+      if (\is_array($value)) {
+        $sub_value = $value['value'] ?? NULL;
+        if ($sub_value === '' || $sub_value === NULL) {
+          $form_state->setValue(
+            [$field_key, 'translation', 'value'],
+            ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
+          );
+          $masked[] = [$field_key, 'translation', 'value'];
+        }
+      }
+      elseif ($value === '' || $value === NULL) {
+        $form_state->setValue(
+          [$field_key, 'translation'],
+          ComponentInputsTranslatablesExtractor::EMPTY_SENTINEL,
+        );
+        $masked[] = [$field_key, 'translation'];
+      }
+    }
+    $form_state->set('canvas_local_task_masked_keys', $masked);
+  }
+
+  /**
+   * Form validate callback: restores masked local-task translations.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The form state.
+   */
+  public static function unmaskEmptyLocalTaskTranslations(array &$form, FormStateInterface $form_state): void {
+    foreach ($form_state->get('canvas_local_task_masked_keys') ?? [] as $path) {
+      $form_state->setValue($path, '');
+    }
+    $form_state->set('canvas_local_task_masked_keys', []);
+  }
+
+  /**
    * Form validate callback: masks empty component_tree translations with ∅.
    *
    * Runs before TMGMT's ::validateJobItem, which reads the translation from
@@ -386,6 +527,47 @@ final readonly class TmgmtHooks {
           if ($field_key === $field_name || \str_starts_with((string) $field_key, $field_name . '|')) {
             $paths[] = [(string) $group_key, (string) $parent_key, (string) $field_key];
           }
+        }
+      }
+    }
+    return $paths;
+  }
+
+  /**
+   * Finds the translation form rows that belong to the Canvas field.
+   *
+   * LocalTaskItemForm nests translation rows two levels deep under
+   * $form['translation']:
+   * 1. top key: the first segment of the TMGMT data key, i.e. the entity field
+   *    name (e.g. "components").
+   * 2. field key: the full '|'-joined flattened TMGMT data key of one row
+   *    (e.g. "components|0|heading"), whose children are the row's 'source'
+   *    and 'translation' elements.
+   *
+   * @param array<string, mixed> $form
+   *   The form array.
+   * @param string $field_name
+   *   The Canvas field name on the source entity.
+   *
+   * @return list<array{string, string}>
+   *   [top key, field key] paths under $form['translation'], where the field
+   *   key is the '|'-joined flattened TMGMT data key (e.g.
+   *   "components|0|heading").
+   *
+   * @see \Drupal\tmgmt_local\Form\LocalTaskItemForm::formElement()
+   */
+  private static function getLocalTaskItemRowPaths(array $form, string $field_name): array {
+    $paths = [];
+    if (!isset($form['translation'])) {
+      return [];
+    }
+    foreach (Element::children($form['translation']) as $top_key) {
+      foreach (Element::children($form['translation'][$top_key]) as $field_key) {
+        if (!isset($form['translation'][$top_key][$field_key]['translation'])) {
+          continue;
+        }
+        if ($field_key === $field_name || \str_starts_with((string) $field_key, $field_name . '|')) {
+          $paths[] = [(string) $top_key, (string) $field_key];
         }
       }
     }
