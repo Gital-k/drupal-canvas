@@ -176,6 +176,7 @@ export function createCanvasRequest(
               type,
               id,
               viewMode: url.searchParams.get('viewMode') ?? undefined,
+              language: url.searchParams.get('language') ?? undefined,
             }),
           ),
         );

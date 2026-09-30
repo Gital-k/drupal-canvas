@@ -249,6 +249,7 @@ export class CanvasPageStore {
     if (this.context?.canvas) return this.context.canvas.fetchEntity(options);
     const query = new URLSearchParams({ type: options.type, id: options.id });
     if (options.viewMode) query.set('viewMode', options.viewMode);
+    if (options.language) query.set('language', options.language);
     const controller = new AbortController();
     this.entityControllers.add(controller);
     try {

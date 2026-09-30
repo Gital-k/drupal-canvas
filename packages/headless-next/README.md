@@ -205,8 +205,9 @@ are created from; `CanvasRuntime` passes it down automatically, and
 `handleJsonApiProxy(request)` is the proxy the `jsonApiProxy` route handlers
 mount.
 
-`fetchEntity({ type, id, viewMode })` renders one content entity without
-page-level route or head data. Use it for embedded renders such as teaser cards.
+`fetchEntity({ type, id, viewMode, language })` renders one content entity
+without page-level route or head data. Use it for embedded renders such as
+teaser cards.
 
 `toNextMetadata()` maps the Canvas head entries that Next.js Metadata can
 represent. It omits entries that Next.js Metadata cannot represent. Render

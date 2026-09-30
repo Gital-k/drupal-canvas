@@ -5,18 +5,23 @@ declare(strict_types=1);
 namespace Drupal\canvas_headless\Controller;
 
 use Drupal\canvas\AutoSave\AutoSaveManager;
+use Drupal\canvas\EntityTranslationMetadata;
 use Drupal\canvas_headless\CanvasContentEntityRenderer;
+use Drupal\canvas_headless\CanvasContentUrl;
 use Drupal\canvas_headless\PreviewTokenInspector;
 use Drupal\canvas_headless\RenderConverter\JsComponentCanvasRenderConverter;
 use Drupal\canvas_headless\StackMiddleware\CanvasContentApiRequest;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Cache\CacheableJsonResponse;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Entity\ContentEntityInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountProxyInterface;
@@ -33,6 +38,15 @@ final class CanvasEntityController {
 
   public const API_PATH = '/canvas/content-api/entity';
 
+  /**
+   * Selects the rendered entity's language, independent of preview state.
+   *
+   * Unlike CanvasContentApiRequest::PREVIEW_LANGUAGE_QUERY, this always
+   * applies: a direct type/id lookup has no routed URL to negotiate a
+   * language from, so it is the only way a caller can select a translation.
+   */
+  public const LANGUAGE_QUERY = 'language';
+
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
     private readonly EntityRepositoryInterface $entityRepository,
@@ -44,6 +58,7 @@ final class CanvasEntityController {
     private readonly CustomElementNormalizer $customElementNormalizer,
     private readonly AccountProxyInterface $currentUser,
     private readonly RouteMatchInterface $routeMatch,
+    private readonly LanguageManagerInterface $languageManager,
   ) {}
 
   /**
@@ -89,8 +104,16 @@ final class CanvasEntityController {
       }
       throw new BadRequestHttpException('The entity type must be a content entity type.');
     }
-    // Storage loads the default translation; use the request's instead.
-    $entity = $this->entityRepository->getTranslationFromContext($entity);
+    $requested_language = $request->query->get(self::LANGUAGE_QUERY);
+    if ($requested_language !== NULL && (!\is_string($requested_language) || preg_match('/^[a-zA-Z0-9_-]+$/', $requested_language) !== 1)) {
+      throw new BadRequestHttpException('The language query parameter is invalid.');
+    }
+    // Storage loads the default translation; use the request's instead,
+    // honoring an explicit language selection when present. Unlike an empty
+    // langcode, this does not require the requested translation to exist:
+    // getTranslationFromContext() falls back through the same candidates a
+    // missing routed translation would use.
+    $entity = $this->entityRepository->getTranslationFromContext($entity, $requested_language);
 
     $view_mode = (string) $request->query->get('viewMode', 'full');
     if ($view_mode === '' || preg_match('/^[a-z0-9_]+$/', $view_mode) !== 1) {
@@ -144,6 +167,7 @@ final class CanvasEntityController {
       };
     }
 
+    $language_context = $this->buildLanguageContext($rendered_entity, $request, $cacheability);
     $response = new CacheableJsonResponse([
       'content' => $content,
       'managedByCanvas' => $managed_by_canvas,
@@ -154,9 +178,48 @@ final class CanvasEntityController {
         'uuid' => $rendered_entity->uuid(),
         'langcode' => $rendered_entity->language()->getId(),
       ],
-    ]);
+    ] + $language_context);
     $response->addCacheableDependency($cacheability);
     return $response;
+  }
+
+  /**
+   * Builds language-switcher metadata for the rendered entity's translations.
+   *
+   * Reuses the shared translation metadata contract (see
+   * EntityTranslationMetadata) rather than CanvasContentTranslationLinks:
+   * that helper's switch links and negotiatedLanguage describe a routed
+   * page's URL, which a direct type/id lookup does not have. Here
+   * negotiatedLanguage instead reports the language actually rendered, so it
+   * reflects an explicit `language` query parameter, not just ambient
+   * negotiation.
+   *
+   * @return array{negotiatedLanguage: string, translations: list<array>}
+   *   Language context for the rendered entity.
+   */
+  private function buildLanguageContext(ContentEntityInterface $rendered_entity, Request $request, BubbleableMetadata $cacheability): array {
+    $result = [
+      'negotiatedLanguage' => $rendered_entity->language()->getId(),
+      'translations' => [],
+    ];
+    if (!$rendered_entity->hasLinkTemplate('canonical')) {
+      return $result;
+    }
+    $translations = EntityTranslationMetadata::build(
+      $rendered_entity,
+      $this->languageManager,
+      $result['negotiatedLanguage'],
+      static fn (EntityInterface $translation): string => CanvasContentUrl::normalize(
+        $translation->toUrl('canonical')->setAbsolute()->toString(TRUE)->getGeneratedUrl(),
+        $request,
+      ),
+      $this->currentUser->getAccount(),
+      $cacheability,
+    );
+    foreach ($translations as $translation) {
+      $result['translations'][] = $translation + ['external' => UrlHelper::isExternal($translation['url'])];
+    }
+    return $result;
   }
 
   /**
@@ -209,6 +272,9 @@ final class CanvasEntityController {
       ->addCacheContexts([
         'oauth2_scopes',
         'url.query_args:' . CanvasContentApiRequest::EXCLUDE_AUTO_SAVE_QUERY,
+        'url.query_args:' . self::LANGUAGE_QUERY,
+        'languages:language_interface',
+        'languages:language_content',
       ]);
     if ($build !== NULL) {
       $cacheability->addCacheableDependency(

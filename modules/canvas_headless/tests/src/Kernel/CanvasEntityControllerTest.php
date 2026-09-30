@@ -210,13 +210,7 @@ final class CanvasEntityControllerTest extends CanvasKernelTestBase {
    * Tests that a language-prefixed request renders the negotiated translation.
    */
   public function testEntityRenderUsesRequestTranslation(): void {
-    $this->installConfig(['language']);
-    $this->installEntitySchema('configurable_language');
-    ConfigurableLanguage::createFromLangcode('fr')->save();
-    $this->config('language.negotiation')
-      ->set('url.prefixes', ['en' => '', 'fr' => 'fr'])
-      ->save();
-    $this->container->get('kernel')->rebuildContainer();
+    $this->installFrenchLanguage();
 
     $node = $this->createTemplateBackedNode();
     $translation = $node->addTranslation('fr', ['title' => 'Contenu français']);
@@ -240,6 +234,77 @@ final class CanvasEntityControllerTest extends CanvasKernelTestBase {
     self::assertSame('fr', $data['entity']['langcode']);
     self::assertSame((string) $node->id(), $data['entity']['id']);
     self::assertSame($node->uuid(), $data['entity']['uuid']);
+  }
+
+  /**
+   * Tests that an explicit language parameter selects a translation.
+   *
+   * A direct type/id lookup has no routed URL path to negotiate a language
+   * from, so this is the only way a decoupled caller can select one. The
+   * response also reports negotiatedLanguage and translations, reusing the
+   * shared translation metadata contract from EntityTranslationMetadata.
+   */
+  public function testEntityRenderUsesExplicitLanguageParameter(): void {
+    $this->installFrenchLanguage();
+
+    $node = $this->createTemplateBackedNode();
+    $translation = $node->addTranslation('fr', ['title' => 'Contenu français']);
+    $translation->save();
+
+    $this->setCurrentAccount($this->editor);
+    $request = Request::create(
+      CanvasEntityController::API_PATH . '?' . http_build_query([
+        'type' => 'node',
+        'id' => (string) $node->id(),
+        'viewMode' => 'teaser',
+        CanvasEntityController::LANGUAGE_QUERY => 'fr',
+      ]),
+    );
+    $response = $this->request($request);
+    self::assertInstanceOf(CacheableJsonResponse::class, $response);
+    $data = self::responseData($response);
+
+    self::assertSame(200, $response->getStatusCode());
+    // No URL prefix was used: the explicit parameter alone selected the
+    // translation.
+    self::assertSame('fr', $data['entity']['langcode']);
+    self::assertSame('fr', $data['negotiatedLanguage']);
+    $by_langcode = array_column($data['translations'], NULL, 'langcode');
+    self::assertTrue($by_langcode['fr']['current']);
+    self::assertTrue($by_langcode['fr']['translationAvailable']);
+    self::assertFalse($by_langcode['en']['current']);
+    self::assertTrue($by_langcode['en']['translationAvailable']);
+    self::assertContains(
+      'url.query_args:' . CanvasEntityController::LANGUAGE_QUERY,
+      $response->getCacheableMetadata()->getCacheContexts(),
+    );
+
+    try {
+      $this->request(Request::create(
+        CanvasEntityController::API_PATH . '?' . http_build_query([
+          'type' => 'node',
+          'id' => (string) $node->id(),
+          CanvasEntityController::LANGUAGE_QUERY => 'not valid!',
+        ]),
+      ));
+      self::fail('Expected a bad request error for an invalid language.');
+    }
+    catch (BadRequestHttpException $exception) {
+      self::assertSame('The language query parameter is invalid.', $exception->getMessage());
+    }
+  }
+
+  /**
+   * Installs French alongside English, with URL-prefix negotiation enabled.
+   */
+  private function installFrenchLanguage(): void {
+    $this->installConfig(['language']);
+    $this->installEntitySchema('configurable_language');
+    ConfigurableLanguage::createFromLangcode('fr')->save();
+    $this->config('language.negotiation')
+      ->set('url.prefixes', ['en' => '', 'fr' => 'fr'])
+      ->save();
+    $this->container->get('kernel')->rebuildContainer();
   }
 
   /**

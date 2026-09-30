@@ -118,8 +118,9 @@ for the same reason: `await` them like `getClient()`. All three create the
 shared `drupal-canvas` client (`createJsonApiClient()`), which deserializes
 responses with `DefaultSerializer`.
 
-`fetchEntity(Astro, { type, id, viewMode })` renders one content entity without
-page-level route or head data. Use it for embedded renders such as teaser cards.
+`fetchEntity(Astro, { type, id, viewMode, language })` renders one content
+entity without page-level route or head data. Use it for embedded renders such
+as teaser cards.
 
 `page.context` carries the page and site context (title, breadcrumbs, primary
 entity, branding) Drupal generated for the routed page. To fetch JSON:API

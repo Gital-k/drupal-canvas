@@ -1197,6 +1197,8 @@ describe('fetchEntity', () => {
       uuid: 'node-uuid',
       langcode: 'en',
     },
+    negotiatedLanguage: 'en',
+    translations: [],
   };
 
   it('fetches one public entity in a specific view mode', async () => {
@@ -1209,6 +1211,29 @@ describe('fetchEntity', () => {
     expect(fetchImpl).toHaveBeenCalledWith(
       new URL(
         'https://drupal.example/canvas/content-api/entity?type=node&id=2&viewMode=teaser',
+      ),
+      expect.objectContaining({
+        cache: 'no-store',
+        headers: { Accept: 'application/json' },
+      }),
+    );
+  });
+
+  it('selects a translation directly with the language option', async () => {
+    const translated = {
+      ...entity,
+      entity: { ...entity.entity, langcode: 'fr' },
+      negotiatedLanguage: 'fr',
+    };
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json(translated));
+    const { server } = makeServer(fetchImpl as unknown as typeof fetch);
+
+    await expect(
+      server.fetchEntity({ type: 'node', id: '2', language: 'fr' }),
+    ).resolves.toEqual(translated);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      new URL(
+        'https://drupal.example/canvas/content-api/entity?type=node&id=2&language=fr',
       ),
       expect.objectContaining({
         cache: 'no-store',
