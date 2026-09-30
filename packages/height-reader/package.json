@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.1",
-    "jsdom": "^26.1.0",
+    "jsdom": "^30.0.0",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   },
