@@ -17,7 +17,7 @@
     "docs/user",
     "tests/modules/canvas_test_extension"
   ],
-  "packageManager": "npm@11.20.0",
+  "packageManager": "npm@12.1.0",
   "scripts": {
     "changeset:prompt": "node scripts/changeset-prompt.js",
     "packages:build": "turbo run build --filter='./packages/*'",
