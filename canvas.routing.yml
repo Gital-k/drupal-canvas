@@ -145,7 +145,7 @@ canvas.api.config.delete:
     _entity_access: 'canvas_config_entity.delete'
     _canvas_http_eligible_config_entity: 'TRUE'
     # Allow a subset: `Component` config entities are read-only via the internal HTTP API.
-    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|page_variant|color)'
+    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|canvas_page_variant|color)'
   options:
     parameters:
       canvas_config_entity:
@@ -164,7 +164,7 @@ canvas.api.config.get:
     _canvas_http_eligible_config_entity: 'TRUE'
     _entity_access: 'canvas_config_entity.view'
     # Allow a subset: `Component` config entities are read-only via the internal HTTP API.
-    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|page_variant|color)'
+    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|canvas_page_variant|color)'
     # The UI client can fetch all the components the current user has access too, regardless of which kind of Canvas-enabled
     # entity you're editing.
     _canvas_ui_access: 'TRUE'
@@ -188,7 +188,7 @@ canvas.api.config.list: &config_list_route
     # But deter users from trying to access other config entities via this route: this ensures 404 responses rather than
     # 403.
     # @see \Drupal\Tests\canvas\Functional\CanvasConfigEntityHttpApiTest::testNonCanvasConfigEntity()
-    canvas_config_entity_type_id: '(folder|content_template|component|pattern|js_component|asset_library|brand_kit|page_variant|color)'
+    canvas_config_entity_type_id: '(folder|content_template|component|pattern|js_component|asset_library|brand_kit|canvas_page_variant|color)'
     # The UI client can fetch all the components the current user has access too, regardless of which kind of Canvas-enabled
     # entity you're editing.
     _canvas_ui_access: 'TRUE'
@@ -244,7 +244,7 @@ canvas.api.config.patch:
     _canvas_http_eligible_config_entity: 'TRUE'
     _entity_access: 'canvas_config_entity.update'
     # Allow a subset: `Component` config entities are read-only via the internal HTTP API.
-    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|page_variant|color)'
+    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|canvas_page_variant|color)'
   options:
     parameters:
       canvas_config_entity:
@@ -264,7 +264,7 @@ canvas.api.config.post:
     # @todo: Use _entity_create_access once dynamic entity types are supported. See https://www.drupal.org/project/drupal/issues/3516775
     _canvas_entity_create_access: 'canvas_config_entity_type_id'
     # Allow a subset: `Component` config entities are read-only via the internal HTTP API.
-    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|page_variant|color)'
+    canvas_config_entity_type_id: '(content_template|folder|pattern|js_component|asset_library|brand_kit|canvas_page_variant|color)'
   options:
     # Indicate that external applications may use this route. For authentication, see `modules/canvas_oauth/README.md`.
     canvas_external_api: true
@@ -278,7 +278,7 @@ canvas.api.config.translation.delete:
     _canvas_authentication_required: TRUE
     # Symmetrical translations are only supported for Content Templates and
     # Page Variants.
-    canvas_config_entity_type_id: '(content_template|page_variant)'
+    canvas_config_entity_type_id: '(content_template|canvas_page_variant)'
     _permission: 'translate configuration'
   options:
     parameters:
@@ -989,6 +989,19 @@ entity.canvas_page.add_page:
     _csrf_token: 'TRUE'
   options:
     _admin_route: TRUE
+# @todo Remove this once linking to the Canvas Page Variant editor UI is possible
+entity.canvas_page_variant.edit_form:
+  path: '/admin/structure/page-variant/{canvas_page_variant}'
+  defaults:
+    _controller: '\Drupal\canvas\Controller\NoUiConfigController::placeholder'
+    _title_callback: '\Drupal\Core\Entity\Controller\EntityController::editTitle'
+  requirements:
+    _permission: 'administer page template'
+  options:
+    parameters:
+      canvas_page_variant:
+        type: entity:canvas_page_variant
+    _admin_route: TRUE
 entity.component.audit:
   path: '/admin/appearance/component/{component}/audit'
   defaults:
@@ -1034,17 +1047,4 @@ entity.content_template.edit_form:
     parameters:
       content_template:
         type: entity:content_template
-    _admin_route: TRUE
-# @todo Remove this once linking to the Canvas Page Variant editor UI is possible
-entity.page_variant.edit_form:
-  path: '/admin/structure/page-variant/{page_variant}'
-  defaults:
-    _controller: '\Drupal\canvas\Controller\NoUiConfigController::placeholder'
-    _title_callback: '\Drupal\Core\Entity\Controller\EntityController::editTitle'
-  requirements:
-    _permission: 'administer page template'
-  options:
-    parameters:
-      page_variant:
-        type: entity:page_variant
     _admin_route: TRUE

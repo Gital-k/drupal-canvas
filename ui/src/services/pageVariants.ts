@@ -32,10 +32,10 @@ const refreshPageDataForms = (dispatch: Dispatch) => {
   );
 };
 
-// The `page_variant` config entity type id, as used in editor routes and the
-// layout API.
+// The `canvas_page_variant` config entity type id, as used in editor routes
+// and the layout API.
 // @see \Drupal\canvas\Entity\PageVariant::ENTITY_TYPE_ID
-export const PAGE_VARIANT_ENTITY_TYPE = 'page_variant';
+export const PAGE_VARIANT_ENTITY_TYPE = 'canvas_page_variant';
 
 // The intrinsic "Page content" marker. A valid page variant must contain
 // exactly one, marking where the route's main content is injected at render
@@ -187,25 +187,25 @@ export const buildDuplicateVariantPayload = ({
   };
 };
 
-// A service for the `page_variant` config entity plus the site default page
-// variant setting. Uses the plain (non-auto-save) base query because these are
-// direct config entity writes, matching the pattern service.
+// A service for the `canvas_page_variant` config entity plus the site default
+// page variant setting. Uses the plain (non-auto-save) base query because these
+// are direct config entity writes, matching the pattern service.
 export const pageVariantsApi = createApi({
   reducerPath: 'pageVariantsApi',
   baseQuery,
   tagTypes: ['PageVariants', 'DefaultPageVariant'],
   endpoints: (builder) => ({
     getPageVariants: builder.query<PageVariantsList, void>({
-      query: () => '/canvas/api/v0/config/page_variant',
+      query: () => '/canvas/api/v0/config/canvas_page_variant',
       providesTags: () => [{ type: 'PageVariants', id: 'LIST' }],
     }),
     getPageVariant: builder.query<PageVariant, string>({
-      query: (id) => `/canvas/api/v0/config/page_variant/${id}`,
+      query: (id) => `/canvas/api/v0/config/canvas_page_variant/${id}`,
       providesTags: (result, error, id) => [{ type: 'PageVariants', id }],
     }),
     createPageVariant: builder.mutation<PageVariant, CreatePageVariantPayload>({
       query: (body) => ({
-        url: '/canvas/api/v0/config/page_variant',
+        url: '/canvas/api/v0/config/canvas_page_variant',
         method: 'POST',
         body,
       }),
@@ -222,7 +222,7 @@ export const pageVariantsApi = createApi({
     }),
     updatePageVariant: builder.mutation<PageVariant, UpdatePageVariantPayload>({
       query: ({ id, ...body }) => ({
-        url: `/canvas/api/v0/config/page_variant/${id}`,
+        url: `/canvas/api/v0/config/canvas_page_variant/${id}`,
         method: 'PATCH',
         body,
       }),
@@ -269,7 +269,7 @@ export const pageVariantsApi = createApi({
     }),
     deletePageVariant: builder.mutation<void, string>({
       query: (id) => ({
-        url: `/canvas/api/v0/config/page_variant/${id}`,
+        url: `/canvas/api/v0/config/canvas_page_variant/${id}`,
         method: 'DELETE',
       }),
       async onQueryStarted(_id, { dispatch, queryFulfilled }) {

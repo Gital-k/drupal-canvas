@@ -57,7 +57,7 @@ export function getGroupLabel(entityType: string): string {
       return 'Brand kit';
     case 'page_region':
       return 'Regions';
-    case 'page_variant':
+    case 'canvas_page_variant':
       return 'Page templates';
     case 'staged_config_update':
       return 'Configuration updates';

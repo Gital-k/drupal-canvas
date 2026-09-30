@@ -795,3 +795,42 @@ function canvas_post_update_0030_page_variant_selection_options(): void {
   $storage_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldStorageDefinitions('canvas_page');
   $update_manager->updateFieldStorageDefinition($storage_definitions['page_variant']);
 }
+
+/**
+ * Renames the page_variant entity type ID to canvas_page_variant.
+ *
+ * @see https://www.drupal.org/i/3592135
+ */
+function canvas_post_update_0031_rename_page_variant_entity_type(): void {
+  $update_manager = \Drupal::service(EntityDefinitionUpdateManagerInterface::class);
+  \assert($update_manager instanceof EntityDefinitionUpdateManagerInterface);
+
+  // 1. Remove Canvas's old definition, never Page Manager's. Config is kept.
+  $legacy_entity_type_id = 'page_variant';
+  $legacy = $update_manager->getEntityType($legacy_entity_type_id);
+  if ($legacy !== NULL && $legacy->getProvider() === 'canvas') {
+    $update_manager->uninstallEntityType($legacy);
+  }
+
+  // 2. Install the renamed entity type.
+  if ($update_manager->getEntityType(PageVariant::ENTITY_TYPE_ID) === NULL) {
+    $update_manager->installEntityType(\Drupal::entityTypeManager()->getDefinition(PageVariant::ENTITY_TYPE_ID));
+  }
+
+  // 3. Rekey auto-saves and form violations.
+  // @see \Drupal\canvas\AutoSave\AutoSaveManager::getAutoSaveKey()
+  $legacy_key_prefix = $legacy_entity_type_id . ':';
+  foreach ([AutoSaveManager::AUTO_SAVE_STORE, AutoSaveManager::FORM_VIOLATIONS_STORE] as $collection) {
+    $store = \Drupal::service('keyvalue')->get($collection);
+    foreach ($store->getAll() as $key => $value) {
+      if (!\is_string($key) || !\str_starts_with($key, $legacy_key_prefix)) {
+        continue;
+      }
+      if (\is_array($value) && ($value['entity_type'] ?? NULL) === $legacy_entity_type_id) {
+        $value['entity_type'] = PageVariant::ENTITY_TYPE_ID;
+      }
+      $store->set(PageVariant::ENTITY_TYPE_ID . ':' . \substr($key, \strlen($legacy_key_prefix)), $value);
+      $store->delete($key);
+    }
+  }
+}

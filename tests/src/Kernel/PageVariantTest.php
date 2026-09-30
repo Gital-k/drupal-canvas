@@ -22,13 +22,18 @@ use Drupal\Component\Serialization\Json;
 use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Config\ConfigException;
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\Entity\ConfigEntityStorage;
+use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\Config\Entity\ConfigEntityTypeInterface;
 use Drupal\Core\Config\StorageCacheInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\Display\VariantManager;
+use Drupal\Core\Entity\EntityDefinitionUpdateManagerInterface;
 use Drupal\Core\Entity\EntityFieldManagerInterface;
+use Drupal\Core\Entity\EntityLastInstalledSchemaRepositoryInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\RouteMatch;
@@ -39,6 +44,7 @@ use Drupal\Tests\canvas\Kernel\Traits\PageTrait;
 use Drupal\Tests\canvas\Traits\GenerateComponentConfigTrait;
 use Drupal\Tests\user\Traits\UserCreationTrait;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversFunction;
 use PHPUnit\Framework\Attributes\Group;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
@@ -61,6 +67,7 @@ use Symfony\Component\Validator\ConstraintViolationInterface;
  * @see \Drupal\canvas\Entity\ContentTemplate
  */
 #[CoversClass(PageVariant::class)]
+#[CoversFunction('canvas_post_update_0031_rename_page_variant_entity_type')]
 #[Group('canvas')]
 final class PageVariantTest extends CanvasKernelTestBase {
 
@@ -948,7 +955,7 @@ final class PageVariantTest extends CanvasKernelTestBase {
 
     $subscriber = $this->container->get(PageVariantSelectorSubscriber::class);
     self::assertInstanceOf(PageVariantSelectorSubscriber::class, $subscriber);
-    $route = new Route('/canvas/api/v0/layout/page_variant/{entity}');
+    $route = new Route('/canvas/api/v0/layout/canvas_page_variant/{entity}');
 
     // A request without a page variant parameter resolves the site default.
     $event = new PageDisplayVariantSelectionEvent('simple_page', new RouteMatch('canvas.test', $route, [], []));
@@ -1243,6 +1250,87 @@ final class PageVariantTest extends CanvasKernelTestBase {
 
     // A malformed machine name is rejected.
     self::assertArrayHasKey('default_page_variant', $validate('Not Valid'));
+  }
+
+  /**
+   * Tests renaming the entity type ID on a site that installed the old ID.
+   *
+   * @see https://www.drupal.org/i/3592135
+   */
+  public function testRenameReplacesCanvasLegacyEntityTypeId(): void {
+    require_once \dirname(__DIR__, 3) . '/canvas.post_update.php';
+    $this->setLegacyPageVariantInstalledDefinition('canvas', PageVariant::class);
+    $this->deleteCanvasPageVariantInstalledDefinition();
+
+    PageVariant::create([
+      'id' => 'marketing',
+      'label' => 'Marketing',
+      'component_tree' => [self::markerInstance()],
+    ])->save();
+    $auto_save_store = $this->container->get(KeyValueFactoryInterface::class)->get(AutoSaveManager::AUTO_SAVE_STORE);
+    $auto_save_store->set('page_variant:marketing', ['entity_type' => 'page_variant', 'entity_id' => 'marketing', 'data' => []]);
+    $violations_store = $this->container->get(KeyValueFactoryInterface::class)->get(AutoSaveManager::FORM_VIOLATIONS_STORE);
+    $violations_store->set('page_variant:marketing', 'violations');
+    // Entries of other entity types must be left alone.
+    $auto_save_store->set('canvas_page:1:en', ['entity_type' => 'canvas_page', 'entity_id' => '1', 'data' => []]);
+
+    canvas_post_update_0031_rename_page_variant_entity_type();
+
+    $update_manager = $this->container->get(EntityDefinitionUpdateManagerInterface::class);
+    \assert($update_manager instanceof EntityDefinitionUpdateManagerInterface);
+    self::assertNull($update_manager->getEntityType('page_variant'));
+    self::assertSame('canvas', $update_manager->getEntityType(PageVariant::ENTITY_TYPE_ID)?->getProvider());
+    self::assertArrayNotHasKey('page_variant', $update_manager->getChangeSummary());
+    self::assertArrayNotHasKey(PageVariant::ENTITY_TYPE_ID, $update_manager->getChangeSummary());
+
+    // Config names are unchanged, so the variant is still there.
+    self::assertTrue($this->config('canvas.page_variant.marketing')->get('status'));
+    self::assertInstanceOf(PageVariant::class, PageVariant::load('marketing'));
+
+    self::assertNull($auto_save_store->get('page_variant:marketing'));
+    self::assertSame(
+      ['entity_type' => PageVariant::ENTITY_TYPE_ID, 'entity_id' => 'marketing', 'data' => []],
+      $auto_save_store->get('canvas_page_variant:marketing'),
+    );
+    self::assertNull($violations_store->get('page_variant:marketing'));
+    self::assertSame('violations', $violations_store->get('canvas_page_variant:marketing'));
+    self::assertSame('canvas_page', $auto_save_store->get('canvas_page:1:en')['entity_type']);
+
+    // The update is idempotent.
+    canvas_post_update_0031_rename_page_variant_entity_type();
+    self::assertArrayNotHasKey(PageVariant::ENTITY_TYPE_ID, $this->container->get(EntityDefinitionUpdateManagerInterface::class)->getChangeSummary());
+    self::assertSame('canvas_page_variant:marketing', \array_key_first($violations_store->getAll()));
+  }
+
+  /**
+   * Tests that the rename leaves Page Manager's `page_variant` in place.
+   */
+  public function testRenameLeavesPageManagerEntityTypeIdAlone(): void {
+    require_once \dirname(__DIR__, 3) . '/canvas.post_update.php';
+    $this->setLegacyPageVariantInstalledDefinition('page_manager', 'Drupal\page_manager\Entity\PageVariant');
+    $this->deleteCanvasPageVariantInstalledDefinition();
+
+    canvas_post_update_0031_rename_page_variant_entity_type();
+
+    $repository = $this->container->get(EntityLastInstalledSchemaRepositoryInterface::class);
+    \assert($repository instanceof EntityLastInstalledSchemaRepositoryInterface);
+    self::assertSame('page_manager', $repository->getLastInstalledDefinition('page_variant')?->getProvider());
+    self::assertSame('canvas', $repository->getLastInstalledDefinition(PageVariant::ENTITY_TYPE_ID)?->getProvider());
+  }
+
+  private function setLegacyPageVariantInstalledDefinition(string $provider, string $class): void {
+    $this->container->get(EntityLastInstalledSchemaRepositoryInterface::class)->setLastInstalledDefinition(new ConfigEntityType([
+      'id' => 'page_variant',
+      'provider' => $provider,
+      'class' => $class,
+      'config_prefix' => 'page_variant',
+      'handlers' => ['storage' => ConfigEntityStorage::class],
+      'entity_keys' => ['id' => 'id'],
+    ]));
+  }
+
+  private function deleteCanvasPageVariantInstalledDefinition(): void {
+    $this->container->get(EntityLastInstalledSchemaRepositoryInterface::class)->deleteLastInstalledDefinition(PageVariant::ENTITY_TYPE_ID);
   }
 
 }

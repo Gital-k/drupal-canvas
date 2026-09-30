@@ -19,9 +19,9 @@ Variants are managed and edited entirely in the editor:
 - The "Page templates" section of the Templates panel lists all variants and
   supports create, rename, duplicate, enable/disable, delete, and
   set-as-default. Clicking a
-  variant opens its tree in the editor at `/canvas/editor/page_variant/{id}`,
+  variant opens its tree in the editor at `/canvas/editor/canvas_page_variant/{id}`,
   served by the same layout API as other entities
-  (`/canvas/api/v0/layout/page_variant/{id}`).
+  (`/canvas/api/v0/layout/canvas_page_variant/{id}`).
 - In the variant editor, the "Page content" marker renders as a visible
   placeholder. It can be repositioned but never deleted, duplicated, or copied;
   empty slots render as labeled drop targets. Edits auto-save and publish
@@ -43,8 +43,9 @@ Variants are managed and edited entirely in the editor:
 
 ## Concepts
 
-- **`page_variant` config entity** (`\Drupal\canvas\Entity\PageVariant`): id,
-  label, description, and a component tree. Deployed through configuration
+- **`canvas_page_variant` config entity** (`\Drupal\canvas\Entity\PageVariant`):
+  id, label, description, and a component tree. Stored as `canvas.page_variant.*`
+  config. Deployed through configuration
   management like any Canvas config entity. Has no `theme` dependency, so a
   variant survives a theme switch.
 - **The "Page content" marker**: a component of the dedicated `marker`
@@ -84,7 +85,7 @@ It cannot be uninstalled while a variant uses one of its components.
 
 Running database updates on a site that used page regions:
 
-- Installs the `page_variant` entity type, the `page_variant` selection field on
+- Installs the `canvas_page_variant` entity type, the `page_variant` selection field on
   `canvas_page`, the marker component, and `canvas.settings`.
 - Enables `canvas_page_template_component` and converts each theme's page
   regions into one page variant: the theme page template component with the
@@ -96,6 +97,23 @@ Review the generated variant afterward: the conversion preserves content and the
 theme's markup, but restructuring it into plain Canvas components (dropping the
 theme page template component) is how you fully decouple a variant from its
 theme.
+
+## Renamed entity type ID
+
+Page variants were first released with the entity type ID `page_variant`. That collided with
+Page Manager's `page_variant` entity type. The ID is now `canvas_page_variant`.
+Config names (`canvas.page_variant.*`) and config dependencies are unchanged.
+
+Running database updates:
+
+- Replaces Canvas's installed `page_variant` definition. An installed Page
+  Manager definition is left in place.
+- Rekeys page variant auto-saves and form violations.
+
+The HTTP API and editor paths change from `page_variant` to
+`canvas_page_variant`, for example `/canvas/api/v0/config/canvas_page_variant`.
+The `page_variant` field on `canvas_page`, `pageVariant` in the HTTP API, and
+the `canvas:page_variant` OAuth scope are unchanged.
 
 The upgrade does not force `canvas_page_template_component` to stay enabled:
 it is required only while a variant still contains one of its components. To

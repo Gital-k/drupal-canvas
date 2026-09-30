@@ -780,7 +780,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
         ],
       ],
     ])->save();
-    $url = Url::fromUri('base:/canvas/api/v0/config/page_variant/cacheable');
+    $url = Url::fromUri('base:/canvas/api/v0/config/canvas_page_variant/cacheable');
     foreach (['MISS', 'HIT'] as $cache_status) {
       $response = $this->makeApiRequest('GET', $url, []);
       self::assertSame(200, $response->getStatusCode());
@@ -811,11 +811,11 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
    */
   public function testPageVariant(): void {
     $this->drupalLogin($this->limitedPermissionsUser);
-    $this->assertAuthenticationAndAuthorization('page_variant');
+    $this->assertAuthenticationAndAuthorization(PageVariant::ENTITY_TYPE_ID);
 
     $base = rtrim(base_path(), '/');
-    $list_url = Url::fromUri('base:/canvas/api/v0/config/page_variant');
-    $individual_url = Url::fromUri('base:/canvas/api/v0/config/page_variant/homepage');
+    $list_url = Url::fromUri('base:/canvas/api/v0/config/canvas_page_variant');
+    $individual_url = Url::fromUri('base:/canvas/api/v0/config/canvas_page_variant/homepage');
     $settings_url = Url::fromUri('base:/canvas/api/v0/settings/default-page-variant');
 
     $request_options = [
@@ -883,7 +883,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $request_options[RequestOptions::JSON] = $variant_to_send;
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL, [
       'Location' => [
-        "$base/canvas/api/v0/config/page_variant/homepage",
+        "$base/canvas/api/v0/config/canvas_page_variant/homepage",
       ],
     ]);
     $expected_normalization = [
@@ -913,7 +913,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     // there is no `theme` cache context.
     // @see \Drupal\canvas\Entity\PageVariant::refineListQuery()
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
-      'config:page_variant_list',
+      'config:canvas_page_variant_list',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     $this->assertSame(['homepage' => $expected_normalization], $body);
@@ -923,7 +923,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 409, NULL, NULL, NULL, NULL);
     self::assertSame([
       'errors' => [
-        "'page_variant' entity with ID 'homepage' already exists.",
+        "'canvas_page_variant' entity with ID 'homepage' already exists.",
       ],
     ], $body);
 
@@ -1020,7 +1020,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     self::assertIsArray($body);
     self::assertFalse($body['status']);
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
-      'config:page_variant_list',
+      'config:canvas_page_variant_list',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertIsArray($body);
@@ -1037,7 +1037,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
     $this->assertExpectedResponse('DELETE', $individual_url, [], 204, NULL, NULL, NULL, NULL);
 
     $body = $this->assertExpectedResponse('GET', $list_url, [], 200, ['user.permissions'], [
-      'config:page_variant_list',
+      'config:canvas_page_variant_list',
       'http_response',
     ], 'UNCACHEABLE (request policy)', 'MISS');
     self::assertSame([], $body);

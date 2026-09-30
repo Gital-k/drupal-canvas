@@ -35,6 +35,7 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
  */
 #[ConfigEntityType(
   id: self::ENTITY_TYPE_ID,
+  config_prefix: self::CONFIG_PREFIX,
   label: new TranslatableMarkup('Page variant'),
   label_singular: new TranslatableMarkup('page variant'),
   label_plural: new TranslatableMarkup('page variants'),
@@ -62,7 +63,17 @@ use Drupal\Core\StringTranslation\TranslatableMarkup;
 )]
 final class PageVariant extends ComponentTreeConfigEntityBase implements CanvasHttpApiEligibleConfigEntityInterface, EmptyTargetEntityProviderInterface {
 
-  public const string ENTITY_TYPE_ID = 'page_variant';
+  /**
+   * Prefixed to avoid colliding with Page Manager's `page_variant`.
+   *
+   * @see https://www.drupal.org/i/3592135
+   */
+  public const string ENTITY_TYPE_ID = 'canvas_page_variant';
+
+  /**
+   * Kept unprefixed so config names remain `canvas.page_variant.*`.
+   */
+  public const string CONFIG_PREFIX = 'page_variant';
 
   /**
    * Page variants are administered with the page template permission.

@@ -736,7 +736,7 @@ class TranslationTest extends FunctionalTestBase {
     // on the live page (asserted in testTranslationForPage()).
     // @todo Assert French labels once the variant editor negotiates config
     //   override languages like the content template editor does, in https://www.drupal.org/i/3591806.
-    self::assertSame('English region heading', $get_region_name_in_api_response("/canvas/api/v0/layout/page_variant/chrome"));
+    self::assertSame('English region heading', $get_region_name_in_api_response("/canvas/api/v0/layout/canvas_page_variant/chrome"));
 
     // Create an article node with English and French translations to use as the
     // ContentTemplate preview entity. The French translation has a distinct

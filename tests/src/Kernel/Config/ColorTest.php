@@ -50,9 +50,9 @@ final class ColorTest extends CanvasKernelTestBase {
   private const array USAGE_CACHE_TAGS = [
     'canvas__auto_save',
     'canvas_page_list',
+    'config:canvas_page_variant_list',
     'config:content_template_list',
     'config:page_region_list',
-    'config:page_variant_list',
     'config:pattern_list',
   ];
 

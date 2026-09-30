@@ -46,7 +46,9 @@ function waitForVariantMutation(
 ) {
   return page.waitForResponse(
     (response) =>
-      response.url().includes(`/canvas/api/v0/config/page_variant/${id}`) &&
+      response
+        .url()
+        .includes(`/canvas/api/v0/config/canvas_page_variant/${id}`) &&
       response.request().method() === method,
   );
 }
@@ -65,7 +67,9 @@ test.describe('Page variants', () => {
     // stays hidden until a component is selected (variants have no page data),
     // so wait for the editor frame only.
     await page.getByTestId('canvas-page-variant-marketing').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/marketing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/marketing/,
+    );
     await canvas.waitForEditorFrame();
 
     // The "Page content" marker renders as a visible placeholder. Locate the
@@ -358,7 +362,9 @@ test.describe('Page variants', () => {
     const variantRow = variantLayer.getByText('Marketing');
     await expect(variantRow).toBeVisible();
     await variantRow.click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/marketing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/marketing/,
+    );
   });
 
   test('page template form state follows SPA page navigation', async ({
@@ -529,7 +535,9 @@ test.describe('Page variants', () => {
     // it wraps a page's content.
     await createMarketingVariant(page);
     await page.getByTestId('canvas-page-variant-marketing').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/marketing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/marketing/,
+    );
     await canvas.waitForEditorFrame();
     await canvas.openLibraryPanel();
     await canvas.addComponent(
@@ -623,7 +631,9 @@ test.describe('Page variants', () => {
     // Publish recognizable chrome on a template that is not yet the default.
     await createMarketingVariant(page);
     await page.getByTestId('canvas-page-variant-marketing').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/marketing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/marketing/,
+    );
     await canvas.waitForEditorFrame();
     await canvas.openLibraryPanel();
     await canvas.addComponent(
@@ -736,7 +746,7 @@ test.describe('Page variants', () => {
     // Clicking must not navigate into the variant editor (which would 403 and
     // replace the editor with the error boundary).
     await variantLayer.getByText('Page template').click();
-    await expect(page).not.toHaveURL(/\/canvas\/editor\/page_variant\//);
+    await expect(page).not.toHaveURL(/\/canvas\/editor\/canvas_page_variant\//);
     // The page settings form offers the same jump; it is gated the same way.
     await expect(page.getByTestId('canvas-page-template-edit')).toHaveCount(0);
   });
@@ -796,6 +806,8 @@ test.describe('Page variants', () => {
     await expect(variantSelect).toBeVisible();
     await variantSelect.selectOption({ label: 'Landing' });
     await pageDataForm.getByTestId('canvas-page-template-edit').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/landing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/landing/,
+    );
   });
 });

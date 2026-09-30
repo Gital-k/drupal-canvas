@@ -50,10 +50,10 @@ final readonly class LanguageConfigOverrideSchemaChecker implements EventSubscri
     private TypedConfigManagerInterface $typedConfigManager,
     private ConfigFactoryInterface $configFactory,
   ) {
-    $this->translatableConfigPrefixes = \array_map(
-      static fn(string $entity_type_id): string => 'canvas.' . $entity_type_id . '.',
+    $this->translatableConfigPrefixes = \array_values(\array_map(
+      static fn(string $config_prefix): string => 'canvas.' . $config_prefix . '.',
       ConfigTranslationHooks::TRANSLATABLE_ENTITY_TYPE_IDS,
-    );
+    ));
   }
 
   /**

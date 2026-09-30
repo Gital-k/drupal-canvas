@@ -71,7 +71,9 @@ test.describe('Page variant state isolation', () => {
 
     // Give Alpha a distinctive heading.
     await page.getByTestId('canvas-page-variant-alpha').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/alpha/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/alpha/,
+    );
     await canvas.waitForEditorFrame();
     await canvas.openLibraryPanel();
     await canvas.addComponent(
@@ -87,7 +89,7 @@ test.describe('Page variant state isolation', () => {
     // is already Beta.
     const betaLayoutDelayMs = 12000;
     await page.route(
-      /\/canvas\/api\/v0\/layout\/page_variant\/beta(\?|$)/,
+      /\/canvas\/api\/v0\/layout\/canvas_page_variant\/beta(\?|$)/,
       async (route) => {
         if (route.request().method() === 'GET') {
           await new Promise((r) => setTimeout(r, betaLayoutDelayMs));
@@ -101,12 +103,13 @@ test.describe('Page variant state isolation', () => {
     // Navigate to Beta; its layout is slow, so Alpha's model is still shown.
     const betaLoaded = page.waitForResponse(
       (r) =>
-        /\/canvas\/api\/v0\/layout\/page_variant\/beta(\?|$)/.test(r.url()) &&
-        r.request().method() === 'GET',
+        /\/canvas\/api\/v0\/layout\/canvas_page_variant\/beta(\?|$)/.test(
+          r.url(),
+        ) && r.request().method() === 'GET',
     );
     await openTemplatesPanel(page);
     await page.getByTestId('canvas-page-variant-beta').click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/beta/);
+    await expect(page).toHaveURL(/\/canvas\/editor\/canvas_page_variant\/beta/);
     // Wait briefly so we act squarely inside the still-loading window.
     // eslint-disable-next-line playwright/no-wait-for-timeout
     await page.waitForTimeout(2000);
@@ -130,7 +133,7 @@ test.describe('Page variant state isolation', () => {
 
     // No layout mutation may write Alpha's content to Beta.
     const leaks = layoutMutations.filter(
-      (m) => m.url.includes('/page_variant/beta') && m.hasMarker,
+      (m) => m.url.includes('/canvas_page_variant/beta') && m.hasMarker,
     );
     expect(
       leaks,

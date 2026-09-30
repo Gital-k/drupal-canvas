@@ -144,7 +144,7 @@ final class CanvasPageForm extends ContentEntityForm {
         '#title' => $this->t('Edit template'),
         // TRICKY: an unrouted base: URI, because /canvas/* is an SPA route
         // that Drupal's router would collapse to /canvas.
-        '#url' => Url::fromUri('base:canvas/editor/page_variant/' . $selected),
+        '#url' => Url::fromUri('base:canvas/editor/' . PageVariant::ENTITY_TYPE_ID . '/' . $selected),
         '#attributes' => [
           'class' => ['canvas-page-template-edit'],
           'data-testid' => 'canvas-page-template-edit',

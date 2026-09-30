@@ -136,14 +136,11 @@ final class ApiConfigControllers extends ApiControllerBase {
       ->addCacheableDependency($query_cacheability)
       ->addCacheableDependency($access_cacheability)
       ->addCacheableDependency($normalizations_cacheability);
+    // Covers Canvas and submodule types; need not match the entity type ID.
+    $individual_cache_tag_prefix = 'config:' . $canvas_config_entity_type->getConfigPrefix() . '.';
     $total_cacheability->setCacheTags(array_filter(
       $total_cacheability->getCacheTags(),
-      fn (string $tag): bool =>
-        // Support both Canvas config entity types provided by the main Canvas
-        // module…
-        !str_starts_with($tag, 'config:canvas.' . $canvas_config_entity_type_id)
-        // … and by optional submodules.
-        && !str_starts_with($tag, 'config:canvas_personalization.' . $canvas_config_entity_type_id),
+      fn (string $tag): bool => !str_starts_with($tag, $individual_cache_tag_prefix),
     ));
 
     return (new CacheableJsonResponse($normalizations))

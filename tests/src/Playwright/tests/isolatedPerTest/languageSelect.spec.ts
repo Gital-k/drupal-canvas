@@ -774,18 +774,20 @@ test.describe('Language Select', () => {
       (response) =>
         response
           .url()
-          .includes('/canvas/api/v0/config/page_variant/marketing') &&
+          .includes('/canvas/api/v0/config/canvas_page_variant/marketing') &&
         response.request().method() === 'PATCH',
     );
     await page.getByRole('menuitem', { name: 'Disable' }).click();
     await disableResponse;
     await expect(row.getByText('Disabled')).toBeVisible();
     await row.click();
-    await expect(page).toHaveURL(/\/canvas\/editor\/page_variant\/marketing/);
+    await expect(page).toHaveURL(
+      /\/canvas\/editor\/canvas_page_variant\/marketing/,
+    );
     await canvas.waitForEditorFrame();
     const layout = await page.evaluate(() =>
-      fetch('/canvas/api/v0/layout/page_variant/marketing').then((response) =>
-        response.json(),
+      fetch('/canvas/api/v0/layout/canvas_page_variant/marketing').then(
+        (response) => response.json(),
       ),
     );
     expect(layout.isNew).toBe(true);
