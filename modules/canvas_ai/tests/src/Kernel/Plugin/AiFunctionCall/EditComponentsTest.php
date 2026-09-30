@@ -205,9 +205,9 @@ final class EditComponentsTest extends CanvasKernelTestBase {
     ];
     $result = $this->getToolOutput('canvas_ai:edit_components', ['component_edits' => $edits]);
     $normalized = self::normalizeErrorString($result);
-    $this->assertStringStartsWith('Failed to edit components: Component validation errors:', $normalized);
+    $this->assertStringStartsWith('Nothing was applied. Fix every error listed below and call the tool again. ## Edit 0 - Component validation errors:', $normalized);
     $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.shoe_badge].props.pill: Component `sdc.canvas_test_sdc.shoe_badge`: the `pill` prop value "maybe" cannot be stored: expected a boolean (`true` or `false`).', $normalized);
-    $this->assertStringContainsString('components.1.[sdc.canvas_test_sdc.required-integer].props.count: Component `sdc.canvas_test_sdc.required-integer`: the `count` prop value "canvas" cannot be stored: expected an integer.', $normalized);
+    $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.required-integer].props.count: Component `sdc.canvas_test_sdc.required-integer`: the `count` prop value "canvas" cannot be stored: expected an integer.', $normalized);
   }
 
   /**

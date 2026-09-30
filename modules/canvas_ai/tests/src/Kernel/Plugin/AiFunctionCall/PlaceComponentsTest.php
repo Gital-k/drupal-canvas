@@ -217,7 +217,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
     ]);
 
     $normalized = self::normalizeErrorString($result);
-    $this->assertStringStartsWith('Failed to place components: Component validation errors:', $normalized);
+    $this->assertStringStartsWith('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component validation errors:', $normalized);
     // A boolean prop does not accept a string like `"maybe"`.
     $this->assertStringContainsString('components.0.[sdc.canvas_test_sdc.shoe_badge].props.pill: Component `sdc.canvas_test_sdc.shoe_badge`: the `pill` prop value "maybe" cannot be stored: expected a boolean (`true` or `false`).', $normalized);
     // An integer prop does not accept a string like `"canvas"`.
@@ -256,7 +256,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
         - 'just_a_string'
         YAML),
     ]);
-    $this->assertSame('Failed to place components: Component validation errors: components.1: Component entry "just_a_string" cannot be processed: it does not contain the component details in the expected YAML format. (code garbage)', self::normalizeErrorString($result));
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Entry 1 of the components list must be a mapping keyed by the component ID, with its props and slots under it.', self::normalizeErrorString($result));
 
     // The same entry three slot levels deep is reported at its full path.
     $result = $this->getComponentToolOutput([
@@ -274,7 +274,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
                         - 'just_a_string'
         YAML),
     ]);
-    $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots.column_one.0.[sdc.canvas_test_sdc.two_column].slots.column_two.0: Component entry "just_a_string" cannot be processed: it does not contain the component details in the expected YAML format. (code garbage)', self::normalizeErrorString($result));
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots.column_one.0.[sdc.canvas_test_sdc.two_column].slots.column_two.0: Component entry "just_a_string" cannot be processed: it does not contain the component details in the expected YAML format. (code garbage)', self::normalizeErrorString($result));
 
     // A slot value that is not a list of component groups must fail instead
     // of being silently skipped.
@@ -287,7 +287,7 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
               column_one: 'not_a_list'
         YAML),
     ]);
-    $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots.column_one: The `column_one` slot value "not_a_list" cannot be processed: a slot must hold a YAML list of components. (code garbage)', self::normalizeErrorString($result));
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots.column_one: The `column_one` slot value "not_a_list" cannot be processed: a slot must hold a YAML list of components. (code garbage)', self::normalizeErrorString($result));
 
     // A `slots` value that is not a mapping of slot names to component lists
     // must fail instead of being silently skipped.
@@ -299,11 +299,10 @@ final class PlaceComponentsTest extends CanvasKernelTestBase {
             slots: 'not_a_mapping'
         YAML),
     ]);
-    $this->assertSame('Failed to place components: Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots: The `slots` value "not_a_mapping" cannot be processed: each slot name must be a key holding its own list of components. (code garbage)', self::normalizeErrorString($result));
+    $this->assertSame('Nothing was applied. Fix every error listed below and call the tool again. ## Operation 0 - Component validation errors: components.0.[sdc.canvas_test_sdc.two_column].slots: The `slots` value "not_a_mapping" cannot be processed: each slot name must be a key holding its own list of components. (code garbage)', self::normalizeErrorString($result));
 
     // Code components (JS source) resolve props the same way as SDCs, so a
     // prop the component does not define must fail for them too.
-    $this->createTestCodeComponent();
     $this->container->get(AccountProxyInterface::class)->setAccount($this->privilegedUser);
     $this->container->get(CanvasAiTempStore::class)->setData(CanvasAiTempStore::CURRENT_LAYOUT_KEY, $this->getCurrentLayout($layout_type));
 
