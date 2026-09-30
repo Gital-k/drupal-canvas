@@ -337,6 +337,105 @@ describe('createHeightReporter', () => {
     ).toEqual([1800, 4800, null]);
   });
 
+  it('does not probe again when the app writes to the DOM after a probe resize', async () => {
+    // Taller than the viewport, so it is a probe candidate, but content-driven:
+    // the probe rules it out.
+    const section = document.createElement('section');
+    section.style.height = '900px';
+    document.body.appendChild(section);
+
+    let viewportHeight = 500;
+    vi.spyOn(window, 'innerHeight', 'get').mockImplementation(
+      () => viewportHeight,
+    );
+    Object.defineProperty(section, 'clientHeight', {
+      configurable: true,
+      get: () => (section.style.height === 'auto' ? 0 : 900),
+    });
+
+    const { postMessage, triggerMutation } = makeHarness(
+      {},
+      {
+        readDocumentHeight: () => section.clientHeight,
+        onPostMessage: (message, hostWindow) => {
+          if (
+            typeof message !== 'object' ||
+            message === null ||
+            !('type' in message) ||
+            message.type !== HEADLESS_HEIGHT_PROBE_MESSAGE ||
+            !('id' in message) ||
+            typeof message.id !== 'string' ||
+            !('height' in message)
+          ) {
+            return;
+          }
+          viewportHeight =
+            typeof message.height === 'number' ? message.height : 500;
+          queueMicrotask(() => {
+            window.dispatchEvent(
+              new MessageEvent('message', {
+                origin: ORIGIN,
+                source: hostWindow as unknown as Window,
+                data: {
+                  type: HEADLESS_HEIGHT_PROBE_READY_MESSAGE,
+                  hostSessionId: HOST_SESSION_ID,
+                  id: message.id,
+                  height: message.height,
+                },
+              }),
+            );
+          });
+        },
+      },
+    );
+    const probeHeights = () =>
+      postMessage.mock.calls
+        .map(([message]) => message)
+        .filter(
+          (message) =>
+            typeof message === 'object' &&
+            message !== null &&
+            'type' in message &&
+            message.type === HEADLESS_HEIGHT_PROBE_MESSAGE,
+        )
+        .map((message) =>
+          typeof message === 'object' && message !== null && 'height' in message
+            ? message.height
+            : undefined,
+        );
+
+    await vi.waitFor(() => {
+      expect(postMessage).toHaveBeenCalledWith(
+        {
+          type: HEADLESS_HEIGHT_MESSAGE,
+          hostSessionId: HOST_SESSION_ID,
+          height: 900,
+        },
+        ORIGIN,
+      );
+    });
+    expect(probeHeights()).toEqual([1500, 4000, null]);
+
+    // Apps often react to the probe's resize after a debounce (MUI's Slide
+    // waits 166ms), so the write lands once the observer is watching again.
+    // Re-measuring is fine; probing the same ruled-out candidate again would
+    // resize the preview and repeat for as long as it is open.
+    postMessage.mockClear();
+    triggerMutation(900);
+
+    await vi.waitFor(() => {
+      expect(postMessage).toHaveBeenCalledWith(
+        {
+          type: HEADLESS_HEIGHT_MESSAGE,
+          hostSessionId: HOST_SESSION_ID,
+          height: 900,
+        },
+        ORIGIN,
+      );
+    });
+    expect(probeHeights()).toEqual([]);
+  });
+
   it('posts nothing when standalone', () => {
     const { postMessage, triggerResize } = makeHarness({ embedded: false });
     triggerResize(250);
