@@ -102,6 +102,7 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝init␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝mail␞␟value'],
       ],
+      'type=string&x-canvas-icon=1' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:user␝name␞␟value'],
     ],
     // The typical example; with a variety of field types.
     'entity:node:foo' => [
@@ -440,6 +441,28 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_log␞␟value'],
       ],
+      'type=string&x-canvas-icon=1' => [
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝one_from_an_string_list␞␟label'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝title␞␟value'],
+      ],
+      'type=string&x-canvas-icon=1!optional' => [
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_check_it_out␞␟title'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟alt'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝field_silly_image␞␟title'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media:press_releases␝field_media_file␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝marketing_docs␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_optional_vacation_videos␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:baby_videos␝field_media_video_file␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media:vacation_videos␝field_media_video_file_1␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝media_video_field␞␟entity␜␜entity:media␝revision_log_message␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_log␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝revision_uid␞␟entity␜␜entity:user␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:node:foo␝uid␞␟entity␜␜entity:user␝name␞␟value'],
+      ],
     ],
     // Two different media types — each powered by a different MediaSource.
     'entity:media:press_releases' => [
@@ -549,6 +572,13 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝uid␞␟url'],
       ],
       'type=string&pattern=(.|\r?\n)*!optional' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value'],
+      'type=string&x-canvas-icon=1' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝name␞␟value'],
+      'type=string&x-canvas-icon=1!optional' => [
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝field_media_file␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_log_message␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝revision_user␞␟entity␜␜entity:user␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:press_releases␝uid␞␟entity␜␜entity:user␝name␞␟value'],
+      ],
     ],
     'entity:media:baby_videos' => [
       'type=boolean!optional' => [
@@ -666,6 +696,13 @@ class EntityFieldPropSourceMatcherTest extends PropSourceMatcherTestBase {
         ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝uid␞␟url'],
       ],
       'type=string&pattern=(.|\r?\n)*!optional' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value'],
+      'type=string&x-canvas-icon=1' => ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝name␞␟value'],
+      'type=string&x-canvas-icon=1!optional' => [
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝field_media_video_file␞␟description'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_log_message␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝revision_user␞␟entity␜␜entity:user␝name␞␟value'],
+        ['sourceType' => PropSource::EntityField->value, 'expression' => 'ℹ︎␜entity:media:baby_videos␝uid␞␟entity␜␜entity:user␝name␞␟value'],
+      ],
     ],
   ];
 
