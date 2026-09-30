@@ -60,7 +60,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-formatter-junit": "^9.0.1",
     "eslint-plugin-chai-friendly": "^1.1.0",
-    "eslint-plugin-cypress": "^5.2.0",
+    "eslint-plugin-cypress": "^7.0.0",
     "eslint-plugin-mocha": "^11.2.0",
     "eslint-plugin-playwright": "^2.10.2",
     "eslint-plugin-react": "^7.37.5",
