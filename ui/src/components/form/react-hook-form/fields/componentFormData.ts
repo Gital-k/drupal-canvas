@@ -78,6 +78,10 @@ export const formStateToObject = (
       normalizedKey.indexOf(']', prefix.length) === normalizedKey.length - 1;
     if (isDirectArrayProp) {
       arrayPropNames.push(toPropName(normalizedKey, componentId));
+    }
+    if (Array.isArray(value)) {
+      // Append each element separately; URLSearchParams#append would otherwise
+      // comma-join the array into a single entry, corrupting multi-value props.
       if ((value as any[]).length) {
         (value as any[]).forEach((item) => params.append(key, item));
       } else {
