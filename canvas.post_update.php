@@ -10,6 +10,7 @@ use Drupal\canvas\Entity\Color;
 use Drupal\canvas\Entity\Component;
 use Drupal\canvas\Entity\ContentTemplate;
 use Drupal\canvas\Entity\Folder;
+use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Entity\PageRegion;
 use Drupal\canvas\Entity\PageVariant;
 use Drupal\canvas\Entity\Pattern;
@@ -794,4 +795,15 @@ function canvas_post_update_0030_page_variant_selection_options(): void {
   // varchar column); only the field type and its settings change.
   $storage_definitions = \Drupal::service(EntityFieldManagerInterface::class)->getFieldStorageDefinitions('canvas_page');
   $update_manager->updateFieldStorageDefinition($storage_definitions['page_variant']);
+}
+
+/**
+ * Escapes the `meta:enum` keys stored by every code component.
+ */
+function canvas_post_update_0031_escape_code_component_meta_enum_keys(array &$sandbox): void {
+  $canvasConfigUpdater = \Drupal::service(CanvasConfigUpdater::class);
+  \assert($canvasConfigUpdater instanceof CanvasConfigUpdater);
+  $canvasConfigUpdater->setDeprecationsEnabled(FALSE);
+  \Drupal::classResolver(ConfigEntityUpdater::class)
+    ->update($sandbox, JavaScriptComponent::ENTITY_TYPE_ID, static fn(JavaScriptComponent $javaScriptComponent): bool => CanvasConfigUpdater::updateJavaScriptComponentMetaEnumKeys($javaScriptComponent));
 }
