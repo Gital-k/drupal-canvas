@@ -1,0 +1,6 @@
+name: Test Canvas Field View access
+type: module
+description: 'Denies "view" access to individual entity fields for testing field-level access filtering in Canvas controllers.'
+package: Testing
+dependencies:
+  - canvas:canvas

@@ -13,6 +13,7 @@ use Drupal\canvas\Resource\CanvasResourceLink;
 use Drupal\canvas\Resource\CanvasResourceLinkCollection;
 use Drupal\canvas\Resource\OffsetPage;
 use Drupal\canvas\Utility\HomePageHelper;
+use Drupal\Component\Serialization\Yaml;
 use Drupal\Component\Transliteration\TransliterationInterface;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Access\AccessResult;
@@ -29,6 +30,7 @@ use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Entity\Query\QueryInterface;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Http\Exception\CacheableAccessDeniedHttpException;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
@@ -59,6 +61,7 @@ final class ApiContentControllers extends ApiControllerBase {
    * The maximum number of entity search results to return.
    */
   private const int MAX_SEARCH_RESULTS = 50;
+  public const string AUTO_SAVED_QUERY_KEY = 'autoSaved';
 
   public function __construct(
     private readonly EntityTypeManagerInterface $entityTypeManager,
@@ -71,6 +74,7 @@ final class ApiContentControllers extends ApiControllerBase {
     #[Autowire(service: 'transliteration')]
     private readonly TransliterationInterface $transliteration,
     private readonly HomePageHelper $homePageHelper,
+    private readonly ModuleHandlerInterface $moduleHandler,
   ) {}
 
   /**
@@ -85,6 +89,109 @@ final class ApiContentControllers extends ApiControllerBase {
     $data = $this->normalizeWithMetadataAndComponents($canvas_page, $cacheability);
 
     $json_response = new CacheableJsonResponse($data);
+    $json_response->addCacheableDependency($cacheability);
+    return $json_response;
+  }
+
+  /**
+   * Returns a JSON response containing a Canvas page values as YAML text.
+   *
+   * The returned values match what is stored in an auto-save item: only
+   * storable (non-computed, or persisted-computed) fields are included.
+   *
+   * Fields the current user cannot *view* are omitted from the YAML output.
+   * Auto-save conflict detection is not affected by this filtering - it
+   * operates on the full stored data regardless of view access.
+   *
+   * @see \Drupal\canvas\AutoSave\AutoSaveManager::toStorableArray()
+   */
+  public function getValuesAsText(Request $request, Page $canvas_page): CacheableJsonResponse {
+    $cacheability = new CacheableMetadata();
+
+    // @todo Remove in https://git.drupalcode.org/project/canvas/-/work_items/3591732
+    $conflict_resolution_dev_mode = $this->moduleHandler->moduleExists('canvas_dev_cd');
+    if (!$conflict_resolution_dev_mode) {
+      $error = [
+        'detail' => 'Feature flag module `canvas_dev_cd` is disabled.',
+        'source' => [
+          'pointer' => AutoSaveManager::getAutoSaveKey($canvas_page),
+        ],
+      ];
+      return new CacheableJsonResponse(data: ['errors' => [$error]], status: Response::HTTP_NOT_FOUND);
+    }
+
+    $cacheability->addCacheableDependency($canvas_page)
+      ->addCacheContexts(['url.query_args:autoSaved']);
+
+    // Determine if we are working with auto-save or published version of the
+    // entity.
+    $auto_saved = $request->query->getBoolean(key: self::AUTO_SAVED_QUERY_KEY, default: TRUE);
+    if ($auto_saved) {
+      $cacheability->addCacheTags([AutoSaveManager::CACHE_TAG]);
+      $auto_save_data = $this->autoSaveManager->getAutoSaveEntity($canvas_page);
+      if ($auto_save_data->isEmpty()) {
+        $error = [
+          'detail' => \sprintf('No auto-save items for entity %s found', $canvas_page->id()),
+          'source' => [
+            'pointer' => AutoSaveManager::getAutoSaveKey($canvas_page),
+          ],
+        ];
+        return new CacheableJsonResponse(data: ['errors' => [$error]], status: Response::HTTP_NOT_FOUND);
+      }
+
+      $canvas_page = $auto_save_data->entity;
+      \assert($canvas_page instanceof Page);
+      // The auto-save timestamp: the time at which user's in-progress changes
+      // were last recorded by AutoSaveManager in the auto-save item, not when
+      // the entity was last saved.
+      $updated = $auto_save_data->updated;
+    }
+    else {
+      // The revision creation timestamp: the time the entity was last saved to
+      // storage. This is *not* the same as the auto-save updated time above -
+      // an auto-save item may be newer than the last published save.
+      // When comparing timestamps across both sides of a diff (auto-save vs
+      // stored), use this value only to establish the baseline revision time.
+      $updated = (int) $canvas_page->getRevisionCreationTime();
+    }
+
+    // This represents the values that can be stored in an auto-save item,
+    // therefore this is what the comparison should use.
+    $entity_values = AutoSaveManager::toStorableArray($canvas_page);
+    $component_trees = [];
+    foreach ($canvas_page->getFieldDefinitions() as $field_name => $field_definition) {
+      // Remove fields user can't update via auto-save.
+      if (!\array_key_exists($field_name, $entity_values)) {
+        continue;
+      }
+      // Note: auto-save items store and hash *all* storable fields, regardless
+      // of the current user's view access. Filtering by view access here means
+      // the returned YAML is a subset of what is actually stored. A text diff
+      // built on this output will therefore not reflect changes to fields the
+      // current user cannot view. Conflicts in those fields will still be
+      // detected by AutoSaveManager (which operates on the full stored data),
+      // but they will not be visible in the diff presented to the user.
+      $field_access = $canvas_page->get($field_name)->access(operation: 'view', return_as_object: TRUE);
+      $cacheability->addCacheableDependency($field_access);
+      if (!$field_access->isAllowed()) {
+        unset($entity_values[$field_name]);
+        continue;
+      }
+      // For UX reasons all component trees should be at the bottom of the
+      // response structure. Split component trees, so they can be appended.
+      if ($field_definition->getType() === ComponentTreeItem::PLUGIN_ID) {
+        $component_trees[$field_name] = $entity_values[$field_name];
+        unset($entity_values[$field_name]);
+      }
+    }
+
+    $json_response = new CacheableJsonResponse(data: [
+      'data' => [
+        'language' => $canvas_page->language()->getId(),
+        'entity' => Yaml::encode($entity_values + $component_trees),
+        'updated' => $updated,
+      ],
+    ]);
     $json_response->addCacheableDependency($cacheability);
     return $json_response;
   }

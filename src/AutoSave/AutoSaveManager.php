@@ -173,7 +173,7 @@ class AutoSaveManager implements EventSubscriberInterface {
    * @see self::isPersistedComputedField()
    * @see \Drupal\canvas\Utility\TypedDataHelper::castRawPhpTypes()
    */
-  private static function toStorableArray(EntityInterface $entity): array {
+  public static function toStorableArray(EntityInterface $entity): array {
     if ($entity instanceof FieldableEntityInterface) {
       $values = [];
       foreach ($entity->getFields(include_computed: TRUE) as $name => $field_item_list) {
