@@ -66,10 +66,12 @@ abstract class JsonSchemaPropsComponentDiscoveryBase {
       // (while the live implementation is still available), so that a
       // component tree referencing this version keeps knowing which inputs are
       // translatable even after the prop is changed or removed from the live
-      // implementation. The full schema cannot be stored: an array prop's
-      // `items` may carry a `meta:enum` whose keys can contain dots, which
-      // config keys cannot hold.
+      // implementation. The full schema still cannot be stored: a `meta:enum`
+      // may carry keys containing dots, which config keys cannot hold. Code
+      // components escape such keys, but an SDC's `meta:enum` is read straight
+      // from its `*.component.yml`, which nothing escapes.
       // @see `type: canvas.json_schema_props`
+      // @see \Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper
       // @see \Drupal\canvas\Plugin\Canvas\ComponentSource\JsonSchemaPropsComponentSourceBase::isExplicitInputTranslatable()
       $string_shape = PropShape::getTranslatableStringShape($prop_shape->resolvedSchema);
       $props[$cpe->propName]['derived_schema_metadata'] = $string_shape === NULL

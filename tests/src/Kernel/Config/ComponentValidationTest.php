@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Drupal\Tests\canvas\Kernel\Config;
 
+use Drupal\canvas\Component\Schema\MetaEnumConfigKeyEscaper;
 use Drupal\canvas\ComponentDoesNotMeetRequirementsException;
 use Drupal\canvas\ComponentSource\ComponentSourceInterface;
 use Drupal\canvas\ComponentSource\ComponentSourceManager;
@@ -833,8 +834,10 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     $this->entity = $component;
     $this->assertValidationErrors([]);
 
-    // Create a code component" that has the same schema, where this is NOT
-    // allowed, due to config (schema) limitations.
+    // A code component built from the same schema is equally valid: its props
+    // live in config, whose keys cannot contain a dot, so the `meta:enum` keys
+    // are escaped before being stored.
+    // @see https://www.drupal.org/i/3553605
     $sdc_yaml = Yaml::parseFile($this->root . self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/component-mismatch-meta-enum/component-mismatch-meta-enum.component.yml');
     $component = Component::load('js.component-mismatch-meta-enum');
     self::assertNull($component);
@@ -842,33 +845,19 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       'machineName' => 'component-mismatch-meta-enum',
       'name' => $this->getRandomGenerator()->sentences(5),
       'status' => FALSE,
-      'props' => $sdc_yaml['props']['properties'],
+      // TRICKY: ::create() stores what it is given as-is, so a schema coming
+      // from anywhere other than the HTTP API must be escaped by its caller.
+      // @see \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide()
+      'props' => MetaEnumConfigKeyEscaper::escape($sdc_yaml['props']['properties']),
       'required' => $sdc_yaml['props']['required'] ?? [],
       'js' => ['original' => '', 'compiled' => ''],
       'css' => ['original' => '', 'compiled' => ''],
       'dataDependencies' => [],
     ]);
     $this->entity = $code_component;
-    try {
-      $this->assertValidationErrors([
-        '' => [
-          'The "meta:enum" keys for the "style" prop enum cannot contain a dot. Offending key: "contains.dots"',
-          'The values for the "style" prop enum must be defined in "meta:enum". Missing keys: "contains_dots"',
-          'The "meta:enum" keys for the "numbers" prop enum cannot contain a dot. Offending key: "3.14"',
-          'The values for the "numbers" prop enum must be defined in "meta:enum". Missing keys: "3_14"',
-        ],
-      ]);
-    }
-    catch (\InvalidArgumentException $e) {
-      // The ::assertValidationErrors() call above did in fact confirm that the
-      // listed validation errors occurred. However, it then checks whether the
-      // config schema checker finds additional problems. And in this case, it
-      // does, precisely because it is using dots in keys, which is not allowed
-      // by the config (schema) system.
-      // In other words: this demonstrates exactly why we need to special-case
-      // code components' metadata!
-      self::assertSame("The configuration property contains doesn't exist.", $e->getMessage());
-    }
+    // Core labels every `enum` value that `meta:enum` does not, and drops every
+    // `meta:enum` key that is not an `enum` value, so no mismatch is left.
+    $this->assertValidationErrors([]);
   }
 
   /**
@@ -883,8 +872,10 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
     $this->entity = $component;
     $this->assertValidationErrors([]);
 
-    // Create a code component that has the same schema, where this is NOT
-    // allowed, due to config (schema) limitations.
+    // A code component built from the same schema reports only the genuine
+    // mismatch: `green_light` has no `meta:enum` entry, because that schema
+    // labels `green.light` instead. Core only fills in missing labels for a
+    // prop's own `enum`, not for the `enum` inside an array prop's `items`.
     $sdc_yaml = Yaml::parseFile($this->root . self::getCiModulePath() . '/tests/modules/canvas_test_sdc/components/component-mismatch-meta-enum-array-items/component-mismatch-meta-enum-array-items.component.yml');
     $component = Component::load('js.component-mismatch-meta-enum-array-items');
     self::assertNull($component);
@@ -892,31 +883,17 @@ class ComponentValidationTest extends BetterConfigEntityValidationTestBase {
       'machineName' => 'component-mismatch-meta-enum-array-items',
       'name' => $this->getRandomGenerator()->sentences(5),
       'status' => FALSE,
-      'props' => $sdc_yaml['props']['properties'],
+      // @see ::testUnmatchedEnumAndMetaEnum()
+      'props' => MetaEnumConfigKeyEscaper::escape($sdc_yaml['props']['properties']),
       'required' => $sdc_yaml['props']['required'] ?? [],
       'js' => ['original' => '', 'compiled' => ''],
       'css' => ['original' => '', 'compiled' => ''],
       'dataDependencies' => [],
     ]);
     $this->entity = $code_component;
-    try {
-      $this->assertValidationErrors([
-        '' => [
-          'The "meta:enum" keys for the "colors" prop enum cannot contain a dot. Offending key: "green.light"',
-          'The values for the "colors" prop enum must be defined in "meta:enum". Missing keys: "green_light"',
-        ],
-      ]);
-    }
-    catch (\InvalidArgumentException $e) {
-      // The ::assertValidationErrors() call above did in fact confirm that the
-      // listed validation errors occurred. However, it then checks whether the
-      // config schema checker finds additional problems. And in this case, it
-      // does, precisely because it is using dots in keys, which is not allowed
-      // by the config (schema) system.
-      // In other words: this demonstrates exactly why we need to special-case
-      // code components' metadata!
-      self::assertSame("The configuration property green doesn't exist.", $e->getMessage());
-    }
+    $this->assertValidationErrors([
+      '' => 'The values for the "colors" prop enum must be defined in "meta:enum". Missing keys: "green_light"',
+    ]);
   }
 
   public function testInvalidPropFieldDefinition(): void {
