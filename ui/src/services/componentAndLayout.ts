@@ -206,7 +206,14 @@ export const componentAndLayoutApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const {
-            data: { entity_form_fields, html, autoSaves, translations },
+            data: {
+              entity_form_fields,
+              html,
+              autoSaves,
+              translations,
+              layout,
+              model,
+            },
             meta,
           } = await queryFulfilled;
           // Only update page data and HTML for the default language. Translation
@@ -228,6 +235,7 @@ export const componentAndLayoutApi = createApi({
             dispatch(setSnapshotHTML(''));
             dispatch(setSnapshotTitle(''));
             dispatch(setHtml(html));
+            dispatch(setLayoutModel({ layout, model, updatePreview: false }));
           }
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
           dispatch(setTranslations(translations || {}));
@@ -307,7 +315,7 @@ export const componentAndLayoutApi = createApi({
       async onQueryStarted(arg, { dispatch, queryFulfilled }) {
         try {
           const {
-            data: { entity_form_fields, html, autoSaves },
+            data: { entity_form_fields, html, autoSaves, layout, model },
             meta,
           } = await queryFulfilled;
           dispatch(
@@ -322,6 +330,7 @@ export const componentAndLayoutApi = createApi({
           // masks the pattern editor frame.
           dispatch(setSnapshotHTML(''));
           dispatch(setHtml(html));
+          dispatch(setLayoutModel({ layout, model, updatePreview: false }));
           handleAutoSavesHashUpdate(dispatch, autoSaves, meta);
         } catch (err) {
           dispatch(resetPageData());
