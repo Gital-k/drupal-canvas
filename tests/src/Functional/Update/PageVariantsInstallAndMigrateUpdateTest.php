@@ -20,6 +20,7 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversFunction('canvas_post_update_0028_install_page_variants')]
 #[CoversFunction('canvas_post_update_0029_migrate_page_regions_to_variants')]
 #[CoversFunction('canvas_post_update_0030_page_variant_selection_options')]
+#[CoversFunction('canvas_post_update_0031_rename_page_variant_entity_type')]
 #[RunTestsInSeparateProcesses]
 #[Group('canvas')]
 final class PageVariantsInstallAndMigrateUpdateTest extends CanvasUpdatePathTestBase {
@@ -50,6 +51,9 @@ final class PageVariantsInstallAndMigrateUpdateTest extends CanvasUpdatePathTest
     // 0028: the entity type, the selection field on canvas_page, the "Page
     // content" marker component, and the settings object all exist.
     $this->assertNotNull(\Drupal::entityDefinitionUpdateManager()->getEntityType(PageVariant::ENTITY_TYPE_ID));
+    // The old `page_variant` ID collided with Page Manager's: never installed.
+    // @see canvas_post_update_0031_rename_page_variant_entity_type()
+    $this->assertNull(\Drupal::entityDefinitionUpdateManager()->getEntityType('page_variant'));
     $this->assertNotNull(\Drupal::entityDefinitionUpdateManager()->getFieldStorageDefinition('page_variant', 'canvas_page'));
     $marker = Component::load(Marker::PAGE_CONTENT_COMPONENT_ID);
     $this->assertNotNull($marker);

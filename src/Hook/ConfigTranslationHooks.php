@@ -19,13 +19,15 @@ use Drupal\Core\Hook\Order\OrderBefore;
 final readonly class ConfigTranslationHooks {
 
   /**
-   * Canvas config entity type IDs that support translation.
+   * Canvas config entity types that support translation.
    *
-   * @var string[]
+   * Keyed by entity type ID, valued by config prefix.
+   *
+   * @var array<string, string>
    */
   public const array TRANSLATABLE_ENTITY_TYPE_IDS = [
-    ContentTemplate::ENTITY_TYPE_ID,
-    PageVariant::ENTITY_TYPE_ID,
+    ContentTemplate::ENTITY_TYPE_ID => ContentTemplate::ENTITY_TYPE_ID,
+    PageVariant::ENTITY_TYPE_ID => PageVariant::CONFIG_PREFIX,
   ];
 
   public function __construct(
@@ -49,7 +51,7 @@ final readonly class ConfigTranslationHooks {
 
     $edit_links = [
       ContentTemplate::ENTITY_TYPE_ID => '/admin/structure/content-template/{content_template}',
-      PageVariant::ENTITY_TYPE_ID => '/admin/structure/page-variant/{page_variant}',
+      PageVariant::ENTITY_TYPE_ID => '/admin/structure/page-variant/{' . PageVariant::ENTITY_TYPE_ID . '}',
     ];
     foreach ($edit_links as $entity_type => $edit_link) {
       if (isset($definitions[$entity_type])) {
@@ -64,7 +66,7 @@ final readonly class ConfigTranslationHooks {
     // A sibling exists for content-defined component trees.
     // @see \Drupal\canvas\Hook\ContentTranslationHooks::entityTypeAlter()
     // @see \Drupal\canvas\Plugin\Validation\Constraint\ComponentTreeSymmetricalTranslationConstraint
-    foreach (self::TRANSLATABLE_ENTITY_TYPE_IDS as $entity_type_id) {
+    foreach (\array_keys(self::TRANSLATABLE_ENTITY_TYPE_IDS) as $entity_type_id) {
       if (isset($definitions[$entity_type_id])) {
         \assert($definitions[$entity_type_id] instanceof ConfigEntityTypeInterface);
         $definitions[$entity_type_id]->addConstraint(CanvasConfigEntityTranslationsAreValidConstraint::PLUGIN_ID);

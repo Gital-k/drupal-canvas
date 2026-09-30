@@ -238,13 +238,13 @@ final class CanvasStaticPropSourceFieldWidget extends FormElementBase {
     // @see \Drupal\ckeditor5\Hook\Ckeditor5Hooks::fieldWidgetSingleElementFormAlter()
     $config_name = $this->element->getRoot()->getName();
     \assert(\is_string($config_name));
-    [$module, $config_entity_type_id, $id] = explode('.', $config_name, 3);
+    [$module, $config_prefix, $id] = explode('.', $config_name, 3);
     if ($module !== 'canvas') {
       throw new \LogicException();
     }
-    $config_entity = match ($config_entity_type_id) {
+    $config_entity = match ($config_prefix) {
       ContentTemplate::ENTITY_TYPE_ID => ContentTemplate::load($id),
-      PageVariant::ENTITY_TYPE_ID => PageVariant::load($id),
+      PageVariant::CONFIG_PREFIX => PageVariant::load($id),
       default => throw new \LogicException(),
     };
     $entity_object_for_field_widget = match (TRUE) {

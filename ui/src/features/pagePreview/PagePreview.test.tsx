@@ -44,7 +44,7 @@ describe('read-only Headless preview', () => {
       'teaser',
     ],
     [
-      '/preview/page_variant/alternate/full',
+      '/preview/canvas_page_variant/alternate/full',
       '/preview/:entityType/:entityId/:width',
       undefined,
     ],

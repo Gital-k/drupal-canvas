@@ -436,7 +436,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
     // dependency system cascade-delete this template when the selected variant
     // is removed.
     if ($this->page_variant !== NULL && isset($dependencies['config'])) {
-      $variant_config_name = 'canvas.' . PageVariant::ENTITY_TYPE_ID . '.' . $this->page_variant;
+      $variant_config_name = 'canvas.' . PageVariant::CONFIG_PREFIX . '.' . $this->page_variant;
       foreach ($dependencies['config'] as $dependency) {
         $name = $dependency instanceof ConfigEntityInterface ? $dependency->getConfigDependencyName() : $dependency;
         if ($name === $variant_config_name) {

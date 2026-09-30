@@ -13,8 +13,8 @@ export interface PageVariantComponentTreeItem {
   inputs: Record<string, unknown> | unknown[];
 }
 
-// The client-side representation of a `page_variant` config entity, as returned
-// by `/canvas/api/v0/config/page_variant/{id}`.
+// The client-side representation of a `canvas_page_variant` config entity, as
+// returned by `/canvas/api/v0/config/canvas_page_variant/{id}`.
 export interface PageVariant {
   id: string;
   label: string | null;
@@ -23,10 +23,11 @@ export interface PageVariant {
   component_tree: PageVariantComponentTreeItem[];
 }
 
-// The list response from `/canvas/api/v0/config/page_variant`, keyed by id.
+// The list response from `/canvas/api/v0/config/canvas_page_variant`, keyed by
+// id.
 export type PageVariantsList = Record<string, PageVariant>;
 
-// The body accepted by POST `/canvas/api/v0/config/page_variant`.
+// The body accepted by POST `/canvas/api/v0/config/canvas_page_variant`.
 export interface CreatePageVariantPayload {
   id: string;
   label: string;
@@ -34,9 +35,9 @@ export interface CreatePageVariantPayload {
   component_tree: PageVariantComponentTreeItem[];
 }
 
-// The body accepted by PATCH `/canvas/api/v0/config/page_variant/{id}` when
-// renaming, re-describing, or enabling/disabling a variant. `id` is immutable
-// server-side, so it is not part of the patch body.
+// The body accepted by PATCH `/canvas/api/v0/config/canvas_page_variant/{id}`
+// when renaming, re-describing, or enabling/disabling a variant. `id` is
+// immutable server-side, so it is not part of the patch body.
 export interface UpdatePageVariantPayload {
   id: string;
   label?: string;

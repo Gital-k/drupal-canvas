@@ -35,8 +35,8 @@ class ConfigWithComponentTreeConfigTranslationUiTest extends ConfigWithComponent
     }
 
     $page_variant_definition = $this->container->get(EntityTypeManagerInterface::class)->getDefinition(PageVariant::ENTITY_TYPE_ID);
-    self::assertSame('/admin/structure/page-variant/{page_variant}', $page_variant_definition->getLinkTemplate('edit-form'));
-    self::assertSame('/admin/structure/page-variant/{page_variant}/translate', $page_variant_definition->getLinkTemplate('config-translation-overview'));
+    self::assertSame('/admin/structure/page-variant/{canvas_page_variant}', $page_variant_definition->getLinkTemplate('edit-form'));
+    self::assertSame('/admin/structure/page-variant/{canvas_page_variant}/translate', $page_variant_definition->getLinkTemplate('config-translation-overview'));
 
     $translation_path = '/admin/structure/content-template/node.article.full/translate/fr/add';
     $field = static fn (string $suffix): string => 'translation[config_names][' . self::CONFIG_NAME . '][component_tree]' . $suffix;
