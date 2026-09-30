@@ -214,13 +214,13 @@ const link: Transformer<
         { name: 'uri', multiple: false },
         propSource,
       );
-      return uri != null ? resolveEntityUri(uri) : uri;
+      return uri != null && uri !== '' ? resolveEntityUri(uri) : null;
     }
     if (record === null || typeof record !== 'object') {
       return null;
     }
     return hasStringUri(record)
-      ? { ...record, uri: resolveEntityUri(record.uri) }
+      ? record.uri !== '' ? { ...record, uri: resolveEntityUri(record.uri) } : null
       : (record as PropsValues);
   });
   if (options.multiple) {
