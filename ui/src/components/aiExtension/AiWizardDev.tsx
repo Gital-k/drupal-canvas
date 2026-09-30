@@ -685,8 +685,7 @@ const AiWizardDev = () => {
   const transformLayout = () => {
     const state = store.getState();
     const theLayout = state?.layoutModel?.present as
-      | LayoutModelSliceState
-      | undefined;
+      LayoutModelSliceState | undefined;
     if (!theLayout?.layout) return null;
     return buildCurrentLayout(theLayout.layout, selectModel(state));
   };
