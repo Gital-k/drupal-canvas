@@ -483,11 +483,14 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
 
     // Normalize component tree for API consumers.
     $component_tree = [];
+    $component_tree_cacheability = new CacheableMetadata();
     foreach ($this->getComponentTree() as $item) {
       \assert($item instanceof ComponentTreeItem);
       $values = \array_map(fn($property) => $property->getValue(), $item->getProperties(TRUE));
       unset($values['parent_item'], $values['component']);
       $values['inputs'] = $item->getInputs();
+      // Resolved inputs depend on e.g. referenced media entities.
+      $component_tree_cacheability->addCacheableDependency($item->get('inputs_resolved'));
       $component_tree[] = $values;
     }
 
@@ -507,6 +510,7 @@ final class ContentTemplate extends ComponentTreeConfigEntityBase implements Can
       preview: NULL,
     )
       ->addCacheableDependency($preview_entity_cacheability)
+      ->addCacheableDependency($component_tree_cacheability)
       // Cacheability metadata for the suggested preview entity.
       ->addCacheContexts($content_entity_type->getListCacheContexts())
       // @phpstan-ignore-next-line argument.type

@@ -731,32 +731,7 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
    */
   public function testPageVariantResolvedInputsCacheability(): void {
     $this->drupalLogin($this->httpApiUser);
-    $media_type = $this->createMediaType('image');
-    $image_uri = $this->getRandomGenerator()->image(uniqid('public://') . '.png', '200x200', '400x400');
-    $file = File::create(['uri' => $image_uri]);
-    $file->save();
-    $media = Media::create([
-      'bundle' => $media_type->id(),
-      'name' => 'Template image',
-      'field_media_image' => ['target_id' => $file->id(), 'alt' => 'Original alt'],
-      'status' => TRUE,
-    ]);
-    $media->save();
-    JavaScriptComponent::create([
-      'machineName' => 'cacheable_banner',
-      'name' => 'Cacheable banner',
-      'status' => TRUE,
-      'props' => [
-        'image' => ['title' => 'Image', 'type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'],
-        'text' => ['title' => 'Text', 'type' => 'string', 'contentMediaType' => 'text/html'],
-      ],
-      'slots' => [],
-      'js' => ['original' => '', 'compiled' => ''],
-      'css' => ['original' => '', 'compiled' => ''],
-      'dataDependencies' => [],
-    ])->save();
-    $component = Component::load('js.cacheable_banner');
-    self::assertInstanceOf(Component::class, $component);
+    [$component, $media, $file] = $this->createCacheableBannerWithMedia();
     $marker = Component::load('marker.page_content');
     self::assertInstanceOf(Component::class, $marker);
     PageVariant::create([
@@ -803,6 +778,91 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
       self::assertIsArray($body);
       self::assertSame('Updated alt', $body['component_tree'][0]['inputs_resolved']['image']['alt']);
     }
+  }
+
+  /**
+   * Tests that editing referenced media invalidates resolved template props.
+   */
+  public function testContentTemplateResolvedInputsCacheability(): void {
+    $this->drupalLogin($this->httpApiUser);
+    NodeType::create(['type' => 'article', 'name' => 'Articles'])->save();
+    [$component, $media, $file] = $this->createCacheableBannerWithMedia();
+    ContentTemplate::create([
+      'content_entity_type_id' => 'node',
+      'content_entity_type_bundle' => 'article',
+      'content_entity_type_view_mode' => 'full',
+      'component_tree' => [
+        [
+          'uuid' => $this->container->get('uuid')->generate(),
+          'component_id' => $component->id(),
+          'component_version' => $component->getActiveVersion(),
+          'inputs' => [
+            'image' => ['target_id' => (int) $media->id()],
+            'text' => ['value' => '<p>Welcome</p>', 'format' => 'canvas_html_block'],
+          ],
+        ],
+      ],
+    ])->save();
+    $url = Url::fromUri('base:/canvas/api/v0/config/content_template/node.article.full');
+    foreach (['MISS', 'HIT'] as $cache_status) {
+      $response = $this->makeApiRequest('GET', $url, []);
+      self::assertSame(200, $response->getStatusCode());
+      self::assertSame($cache_status, $response->getHeaderLine('X-Drupal-Dynamic-Cache'));
+      $body = Json::decode((string) $response->getBody());
+      self::assertSame('Original alt', $body['component_tree'][0]['inputs_resolved']['image']['alt']);
+    }
+
+    $media->set('field_media_image', ['target_id' => $file->id(), 'alt' => 'Updated alt']);
+    $media->save();
+    foreach (['MISS', 'HIT'] as $cache_status) {
+      $body = $this->assertExpectedResponse('GET', $url, [], 200, ['languages:language_interface', 'theme', 'user.node_grants:view', 'user.permissions'], [
+        'config:canvas.content_template.node.article.full',
+        'config:filter.format.canvas_html_block',
+        'config:image.style.canvas_parametrized_width',
+        'file:' . $file->id(),
+        'http_response',
+        'media:' . $media->id(),
+        'node_list:article',
+      ], 'UNCACHEABLE (request policy)', $cache_status);
+      self::assertIsArray($body);
+      self::assertSame('Updated alt', $body['component_tree'][0]['inputs_resolved']['image']['alt']);
+    }
+  }
+
+  /**
+   * Creates a JS component with an image prop, plus an image media entity.
+   *
+   * @return array{0: \Drupal\canvas\Entity\Component, 1: \Drupal\media\Entity\Media, 2: \Drupal\file\Entity\File}
+   *   The component, media and file.
+   */
+  private function createCacheableBannerWithMedia(): array {
+    $media_type = $this->createMediaType('image');
+    $image_uri = $this->getRandomGenerator()->image(uniqid('public://') . '.png', '200x200', '400x400');
+    $file = File::create(['uri' => $image_uri]);
+    $file->save();
+    $media = Media::create([
+      'bundle' => $media_type->id(),
+      'name' => 'Template image',
+      'field_media_image' => ['target_id' => $file->id(), 'alt' => 'Original alt'],
+      'status' => TRUE,
+    ]);
+    $media->save();
+    JavaScriptComponent::create([
+      'machineName' => 'cacheable_banner',
+      'name' => 'Cacheable banner',
+      'status' => TRUE,
+      'props' => [
+        'image' => ['title' => 'Image', 'type' => 'object', '$ref' => 'json-schema-definitions://canvas.module/image'],
+        'text' => ['title' => 'Text', 'type' => 'string', 'contentMediaType' => 'text/html'],
+      ],
+      'slots' => [],
+      'js' => ['original' => '', 'compiled' => ''],
+      'css' => ['original' => '', 'compiled' => ''],
+      'dataDependencies' => [],
+    ])->save();
+    $component = Component::load('js.cacheable_banner');
+    self::assertInstanceOf(Component::class, $component);
+    return [$component, $media, $file];
   }
 
   /**
