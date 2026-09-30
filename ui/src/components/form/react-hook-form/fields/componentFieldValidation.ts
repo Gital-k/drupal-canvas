@@ -5,6 +5,8 @@ import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 import transforms from '@/utils/transforms';
 
+import { isRemoveButtonEnabled } from '@/components/form/components/drupal/multivalueFormUtils';
+
 import {
   getPropsValues,
   propInputData,
@@ -169,6 +171,13 @@ export const shouldSkipPropValidation = (
   if (newValue === '' && !target.required) {
     const schema = propSchemas[propName];
     if (!isRequiredArraySchema(schema)) {
+      return true;
+    }
+    // For a required multivalue prop, the empty value only needs validating
+    // when this is the last remaining row.
+    // While multiple rows exist the remove button stays enabled, and the user
+    // must be allowed to clear/delete a value.
+    if (isRemoveButtonEnabled(target)) {
       return true;
     }
   }
@@ -358,10 +367,13 @@ export const validateNewValue = (
     const schemas = getPropSchemas(inputAndUiData);
     const schema = schemas?.[toPropName(fieldName, selectedComponent)];
 
-    // For required array props with minItems, an empty item value would be
-    // stripped by the transforms pipeline, potentially leaving the array
-    // below its minItems constraint. Reject the empty value immediately so
-    // the PATCH is blocked and the popover shows an inline error.
+    // For a required array prop, an empty value only reaches this point when
+    // it is the last remaining row (shouldSkipPropValidation already lets
+    // empty values through while the remove button is enabled, i.e. more rows
+    // exist). Clearing that last item would strip it from the transforms
+    // pipeline and drop the array below its minItems constraint, so reject the
+    // empty value immediately: the PATCH is blocked and the popover shows an
+    // inline error.
     if (
       isRequiredArraySchema(schema) &&
       (newValue === '' || newValue === null || newValue === undefined)
