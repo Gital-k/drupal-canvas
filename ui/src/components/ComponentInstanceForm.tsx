@@ -367,17 +367,6 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       ? component.propSources
       : {};
 
-    // Check if this component has any props or not.
-    if (
-      isPropSourceComponent(component) &&
-      Object.keys(selectedComponentFieldData).length === 0
-    ) {
-      setFormQueryString('');
-      setEmptyProp(true);
-    } else {
-      setEmptyProp(false);
-    }
-
     const builtPreparedModel = buildPreparedModel(selectedModel, component);
     const prevModel = previousModelRef.current;
     const prevSelectedComponent = previousSelectedComponentRef.current;
@@ -413,6 +402,26 @@ const ComponentInstanceForm: React.FC<ComponentInstanceFormProps> = () => {
       sourceChanged;
 
     if (shouldUpdate) {
+      // Check if this component has any props or not. This must stay inside
+      // the `shouldUpdate` gate: it's re-evaluated every time this effect
+      // runs (e.g. after every prop edit, since `model` is a dependency),
+      // but `selectedComponentFieldData` doesn't change unless the selected
+      // component itself changes. If this ran unconditionally, a plain
+      // value-only edit (where `shouldUpdate` is false because neither the
+      // component nor its prop source metadata changed) would reset
+      // `formQueryString` to '' with nothing to set it back, causing the
+      // settings panel to go blank until something forces `shouldUpdate`
+      // back to true (e.g. re-selecting the component).
+      if (
+        isPropSourceComponent(component) &&
+        Object.keys(selectedComponentFieldData).length === 0
+      ) {
+        setFormQueryString('');
+        setEmptyProp(true);
+      } else {
+        setEmptyProp(false);
+      }
+
       // Build the query string only when needed
       const tree = findComponentByUuid(layout, selectedComponent);
       const query = new URLSearchParams({
