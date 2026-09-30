@@ -1,6 +1,7 @@
 import addFormats from 'ajv-formats';
 import { createCanvasAjv } from '@drupal-canvas/json-schema-validation';
 
+import { isRemoveButtonEnabled } from '@/components/form/components/drupal/multivalueFormUtils';
 import { isPropSourceComponent } from '@/types/Component';
 import { parseValue } from '@/utils/function-utils';
 import transforms from '@/utils/transforms';
@@ -104,6 +105,16 @@ export function getPropSchemas(inputAndUiData: InputUIData) {
 }
 
 /**
+ * Checks if a schema represents a required array (array type with minItems >= 1).
+ *
+ * @param {SchemaObject | undefined} schema - The JSON Schema to check.
+ * @return {boolean} true if the schema is a required array prop.
+ */
+function isRequiredArraySchema(schema: SchemaObject | undefined): boolean {
+  return schema?.type === 'array' && (schema?.minItems ?? 0) >= 1;
+}
+
+/**
  * Determines if JSON Schema validation should be skipped for a prop.
  *
  * Ideally, this function can be removed at some point. It's here because the
@@ -141,20 +152,39 @@ export const shouldSkipPropValidation = (
     return true;
   }
 
-  // An empty string on an optional field can skip validation. For example, an
-  // empty + optional URI field should not check for URI validity.
-  if (newValue === '' && !target.required) {
+  // Resolve prop name and schemas for validation checks below.
+  const { selectedComponent } = inputAndUiData;
+  const propName = toPropName(name, selectedComponent);
+  const propSchemas = getPropSchemas(inputAndUiData);
+
+  // If no schema is found for this prop, skip validation.
+  if (!propSchemas[propName]) {
     return true;
   }
 
-  const { selectedComponent } = inputAndUiData;
-  const propName = toPropName(name, selectedComponent);
+  // An empty string on an optional field can skip validation. For example, an
+  // empty + optional URI field should not check for URI validity.
+  // However, items inside a required multivalue prop (array with minItems >= 1)
+  // must still be validated: the transforms pipeline filters out empty values,
+  // which can reduce the array below its minItems constraint.
+  if (newValue === '' && !target.required) {
+    const schema = propSchemas[propName];
+    if (!isRequiredArraySchema(schema)) {
+      return true;
+    }
+    // For a required multivalue prop, the empty value only needs validating
+    // when this is the last remaining row.
+    // While multiple rows exist the remove button stays enabled, and the user
+    // must be allowed to clear/delete a value.
+    if (isRemoveButtonEnabled(target)) {
+      return true;
+    }
+  }
 
   // Object props (e.g. image) have a source shape that differs from
   // their resolved value, so they can't be validated client-side,
   // server-side validation still runs.
   // @todo Replace the blanket object skip with a more targeted approach in https://git.drupalcode.org/project/canvas/-/work_items/3591602
-  const propSchemas = getPropSchemas(inputAndUiData);
   if (
     propSchemas[propName]?.type === 'object' ||
     (propSchemas[propName]?.type === 'array' &&
@@ -335,6 +365,25 @@ export const validateNewValue = (
   if (!shouldSkipPropValidation(fieldName, target, inputAndUiData, newValue)) {
     const schemas = getPropSchemas(inputAndUiData);
     const schema = schemas?.[toPropName(fieldName, selectedComponent)];
+
+    // For a required array prop, an empty value only reaches this point when
+    // it is the last remaining row (shouldSkipPropValidation already lets
+    // empty values through while the remove button is enabled, i.e. more rows
+    // exist). Clearing that last item would strip it from the transforms
+    // pipeline and drop the array below its minItems constraint, so reject the
+    // empty value immediately: the PATCH is blocked and the popover shows an
+    // inline error.
+    if (
+      isRequiredArraySchema(schema) &&
+      (newValue === '' || newValue === null || newValue === undefined)
+    ) {
+      return {
+        valid: false,
+        errors: null,
+        errorMessage: 'This field is required.',
+      };
+    }
+
     const schemaToCoerceAgainst =
       schema?.type === 'array' ? schema.items : schema;
     const isEnum = schemaToCoerceAgainst?.enum && Array.isArray(newValue);
