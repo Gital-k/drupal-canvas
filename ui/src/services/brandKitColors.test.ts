@@ -335,9 +335,9 @@ describe('brand kit color optimistic edits', () => {
     await edit;
     await flush();
 
-    // The newer write (rename) is rejected too. Its undo only reverts the
-    // name it patched — the still-applied, already-rejected hex change must
-    // not be left behind.
+    // The newer write (rename) is rejected too. This asserts that its cache
+    // rollback clears both the name it patched and the earlier, 
+    // already-rejected hex change.
     releaseRename(422);
     await rename;
     await flush();
