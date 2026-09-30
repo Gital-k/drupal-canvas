@@ -49,6 +49,11 @@ final class BlockComponentDiscovery implements ComponentCandidatesDiscoveryInter
     // deprecated: avoid flooding Canvas's tests with this news.
     // @see https://www.drupal.org/node/3519248
     'node_syndicate_block',
+    // The Purge UI block's default configuration contains a generated
+    // per-instance purge_block_id. If Canvas versions it as a design
+    // component, block discovery can create random active versions and break
+    // configuration imports.
+    'purge_ui_block',
   ];
 
   public function __construct(
