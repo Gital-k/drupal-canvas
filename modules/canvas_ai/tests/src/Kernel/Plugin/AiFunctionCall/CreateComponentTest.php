@@ -85,7 +85,11 @@ final class CreateComponentTest extends CanvasKernelTestBase {
     $this->assertFalse($component_structure['status']);
     $this->assertEquals($javascript, $component_structure['sourceCodeJs']);
     $this->assertEquals($css, $component_structure['sourceCodeCss']);
-    $this->assertEquals('', $component_structure['compiledJs']);
+    // The source is compiled server-side; compiledJs must equal what the
+    // plugin's own compiler produces (empty when esbuild is unavailable).
+    $compile = new \ReflectionMethod($tool, 'compileSourceJs');
+    $compile->setAccessible(TRUE);
+    $this->assertSame($compile->invoke($tool, $javascript), $component_structure['compiledJs']);
     $this->assertEquals('', $component_structure['compiledCss']);
     $this->assertEquals([], $component_structure['importedJsComponents']);
     $this->assertEquals([], $component_structure['dataDependencies']);
@@ -278,6 +282,32 @@ final class CreateComponentTest extends CanvasKernelTestBase {
       ]
     );
     self::assertYamlError($result, $expected_error);
+  }
+
+  /**
+   * Tests that JSX source is compiled server-side to the automatic runtime.
+   *
+   * Without this, AI-created code components keep an empty compiledJs and
+   * render as "[object Object]".
+   */
+  public function testCreateComponentCompilesJsx(): void {
+    $tool = $this->functionCallManager->createInstance('ai_agent:create_component');
+    $this->assertInstanceOf(CreateComponent::class, $tool);
+
+    $compile = new \ReflectionMethod($tool, 'compileSourceJs');
+    $compile->setAccessible(TRUE);
+    $jsx = "export default function Eyebrow({ text = 'Subtitle' }) {\n  return (<span>{text}</span>);\n}\n";
+    $compiled = $compile->invoke($tool, $jsx);
+
+    if ($compiled === '') {
+      $this->markTestSkipped('esbuild is not available in this environment.');
+    }
+    // The esbuild --jsx=automatic transform emits the react/jsx-runtime import
+    // and keeps the default export, matching the in-browser build.
+    $this->assertStringContainsString('react/jsx-runtime', $compiled);
+    $this->assertStringContainsString('default', $compiled);
+    // Empty source always compiles to an empty string.
+    $this->assertSame('', $compile->invoke($tool, ''));
   }
 
   /**
