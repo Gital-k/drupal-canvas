@@ -216,8 +216,9 @@ test.describe('AI dev chat', () => {
     const progressMessage = chat.locator('.html-message');
     const answer = chat.locator('.text-message.ai-message-text');
     // The Tools menu trigger is a deep-chat custom button inside its shadow
-    // DOM, which CSS locators pierce.
-    const toolsTrigger = chat.locator('.custom-button');
+    // DOM, which CSS locators pierce. The stop button is a custom button too,
+    // so each is addressed by the class deep-chat derives from its position.
+    const toolsTrigger = chat.locator('.custom-button.inside-start');
     const menu = page.getByTestId('canvas-ai-tool-selector');
     const builderRow = menu.getByRole('button', {
       name: /Drupal Canvas Page Agent/,
@@ -373,6 +374,95 @@ test.describe('AI dev chat', () => {
     ).toHaveValue('Visit the Canvas campus and see the builder in action.');
   });
 
+  test('Stopping a running turn', async ({ page, drupal, canvas, ai }) => {
+    // Hold the second hop of the "Approved" turn so the turn is still running
+    // when stop is pressed, and count the hops to show none follows it.
+    let requests = 0;
+    let releaseHeldHop!: () => void;
+    const heldHop = new Promise<void>((resolve) => {
+      releaseHeldHop = resolve;
+    });
+    await page.route('**/admin/api/canvas/ai-dev', async (route) => {
+      requests += 1;
+      if (requests === 3) {
+        await heldHop;
+      }
+      // Stop aborts the request this route is holding, and a route whose
+      // request is gone can no longer be continued.
+      await route.continue().catch(() => {});
+    });
+    await drupal.login({ username: 'ai_editor', password: 'ai_editor' });
+    await canvas.createCanvas();
+    await ai.openPanel();
+
+    const chat = page.getByTestId('canvas-ai-panel').locator('deep-chat');
+    const progressMessage = chat.locator('.html-message');
+    const answer = chat.locator('.text-message.ai-message-text');
+    // Both controls are deep-chat custom buttons, told apart by the class
+    // deep-chat derives from the position each was given.
+    const toolsTrigger = chat.locator('.custom-button.inside-start');
+    const stopButton = chat.locator('.custom-button.inside-end');
+    const menu = page.getByTestId('canvas-ai-tool-selector');
+    const builderRow = menu.getByRole('button', {
+      name: /Drupal Canvas Page Agent/,
+    });
+
+    // The chat is idle, so there is nothing to stop and the button is hidden.
+    await expect(stopButton).toBeHidden();
+
+    await toolsTrigger.click();
+    await builderRow.click();
+    await expect(menu).toBeHidden();
+
+    // @see modules/canvas_ai/tests/modules/canvas_ai_test/fixtures/build_me_a_landing_page.json
+    await ai.submitQuery('Build me a landing page');
+    await expect(answer.last()).toContainText('Here is the plan:');
+    await expect(stopButton).toBeHidden();
+    expect(requests).toBe(1);
+
+    // The user approves, and stops the turn while its second hop is in flight.
+    // @see modules/canvas_ai/tests/modules/canvas_ai_test/fixtures/approved.json
+    await ai.submitQuery('Approved');
+    await expect(progressMessage.last()).toContainText(
+      'Placing the hero section.',
+    );
+    await expect(stopButton).toBeVisible();
+    await expect(toolsTrigger).toBeDisabled();
+
+    await stopButton.click();
+
+    // The turn closes on the notice rather than on the agent's answer: on the
+    // request path onResponse() is the only thing that ends a turn, so without
+    // it the loader would spin for good.
+    await expect(answer.last()).toHaveText(
+      'You interrupted the agent. What would you like to change?',
+    );
+    // The narration of the hops that did land stays, on a status row that
+    // reports stopped. The agent did not finish its work, so the completed
+    // check must not be shown.
+    await expect(
+      progressMessage.last().locator('.aiStoppedIcon'),
+    ).toBeVisible();
+    await expect(
+      progressMessage.last().locator('.aiCompletedIcon'),
+    ).toBeHidden();
+    await expect(progressMessage.last().locator('.aiLoader')).toBeHidden();
+
+    // No hop follows the one that was in flight.
+    releaseHeldHop();
+    expect(requests).toBe(3);
+
+    // The chat is usable again: the stop button is hidden, the Tools trigger
+    // is unlocked and the input takes another prompt.
+    await expect(stopButton).toBeHidden();
+    await expect(toolsTrigger).toBeEnabled();
+    // @see modules/canvas_ai/tests/modules/canvas_ai_test/fixtures/what_is_a_cms.json
+    await ai.submitQuery('What is a CMS?');
+    await expect(answer.last()).toContainText(
+      'A Content Management System (CMS) is a software application',
+    );
+  });
+
   test('Tools dropdown', async ({ page, drupal, canvas, ai }) => {
     // The body of every request the chat sends, in order: the Tool a message
     // was sent with travels as its `selected_tool` key.
@@ -389,8 +479,9 @@ test.describe('AI dev chat', () => {
 
     const chat = page.getByTestId('canvas-ai-panel').locator('deep-chat');
     // The Tools menu trigger is a deep-chat custom button inside its shadow
-    // DOM, which CSS locators pierce.
-    const toolsTrigger = chat.locator('.custom-button');
+    // DOM, which CSS locators pierce. The stop button is a custom button too,
+    // so each is addressed by the class deep-chat derives from its position.
+    const toolsTrigger = chat.locator('.custom-button.inside-start');
     const menu = page.getByTestId('canvas-ai-tool-selector');
     const rows = menu.getByRole('button');
     const componentRow = menu.getByRole('button', {
@@ -534,7 +625,7 @@ test.describe('AI dev chat', () => {
     await expect(
       page.getByRole('textbox', { name: 'Build me a' }),
     ).toBeVisible();
-    await expect(chat.locator('.custom-button')).toHaveCount(0);
+    await expect(chat.locator('.custom-button.inside-start')).toHaveCount(0);
     await expect(page.getByTestId('canvas-ai-tool-selector')).toBeHidden();
     await expect(page.getByTestId('canvas-ai-active-tool')).toBeHidden();
 
