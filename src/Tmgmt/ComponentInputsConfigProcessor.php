@@ -2,6 +2,8 @@
 
 namespace Drupal\canvas\Tmgmt;
 
+use Drupal\canvas\Config\Schema\ComponentInputsMapping;
+use Drupal\canvas\Translation\ComponentInputsTranslatablesExtractor;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\tmgmt_config\DefaultConfigProcessor;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -44,7 +46,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 final class ComponentInputsConfigProcessor extends DefaultConfigProcessor implements ContainerInjectionInterface {
 
   public function __construct(
-    private readonly ComponentInputsTranslatablesExtractor $componentInputsTranslatablesExtractor,
+    private readonly ComponentInputsTranslatablesExtractor $extractor,
   ) {
   }
 
@@ -61,7 +63,10 @@ final class ComponentInputsConfigProcessor extends DefaultConfigProcessor implem
    * {@inheritdoc}
    */
   public function extractTranslatables($schema, $config_data, $base_key = '') {
-    return $this->componentInputsTranslatablesExtractor->extractTranslatables($schema, $config_data, $base_key);
+    if ($schema instanceof ComponentInputsMapping) {
+      return TmgmtComponentTreeData::encode($this->extractor->extractInstance($schema, $config_data ?? []));
+    }
+    return parent::extractTranslatables($schema, $config_data, $base_key);
   }
 
 }
