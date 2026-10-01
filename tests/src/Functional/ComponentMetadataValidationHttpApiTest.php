@@ -74,6 +74,25 @@ class ComponentMetadataValidationHttpApiTest extends HttpApiTestBase {
     $this->assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), (string) $response->getBody());
     $this->assertNull(JavaScriptComponent::load('new_component'));
 
+    // The optional properties may be omitted, exactly as for a POST that
+    // creates a Code Component: this endpoint validates the same payload.
+    // @see https://www.drupal.org/i/3553427
+    $minimal_payload = \array_diff_key(self::validPayload('minimal_component'), \array_flip([
+      'required',
+      'props',
+      'slots',
+      'dataDependencies',
+    ]));
+    $response = $this->makeApiRequest('POST', $url, [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $this->drupalGet('session/token'),
+      ],
+      RequestOptions::JSON => $minimal_payload,
+    ]);
+    $this->assertSame(Response::HTTP_NO_CONTENT, $response->getStatusCode(), (string) $response->getBody());
+    $this->assertNull(JavaScriptComponent::load('minimal_component'));
+
     $stored_payload = self::validPayload('stored_component');
     $stored_payload['props'] = [];
     $stored_payload['slots'] = [];
