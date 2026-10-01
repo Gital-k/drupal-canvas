@@ -134,6 +134,13 @@ content entity directly. Pass `viewMode={viewMode}` to render a specific
 content-template view mode, for example
 `/canvas/content-api/entity?type=node&id=1&viewMode=teaser`.
 
+A type/id lookup has no routed URL to negotiate a language from. Pass
+`language={langcode}` to select a translation directly, for example
+`/canvas/content-api/entity?type=node&id=1&language=fr`. Unlike the content
+endpoint's preview-only `language` hint, this always applies. A missing
+translation uses Drupal's configured fallback; omit it to use Drupal's
+ambient negotiated content language, unchanged from prior behavior.
+
 ### Entity response
 
 ```text
@@ -145,13 +152,25 @@ content-template view mode, for example
     "bundle": "article",
     "id": "1",
     "uuid": "773942c6-3660-4c50-9a8d-e25966a69bff",
-    "langcode": "en"
-  }
+    "langcode": "fr"
+  },
+  "negotiatedLanguage": "fr",
+  "translations": [
+    { "langcode": "en", "name": "English", "nativeName": "English", "url": "https://example.com/node/1", "translationAvailable": true, "current": false, "external": false },
+    { "langcode": "fr", "name": "French", "nativeName": "Français", "url": "https://example.com/fr/node/1", "translationAvailable": true, "current": true, "external": false }
+  ]
 }
 ```
 
 `content` is one structured root or `null`. `managedByCanvas` is `false` when
 Canvas does not manage the requested entity and view mode.
+
+`negotiatedLanguage` reports the language actually rendered — `entity.langcode`'s
+value, reflecting the `language` query parameter when given and available.
+`translations` shares the fields of the content endpoint's `route.translations`
+(see below), built from the entity's own canonical URL rather than the routed
+page. Empty on monolingual sites and entities without a canonical link
+template.
 
 ### Content response
 

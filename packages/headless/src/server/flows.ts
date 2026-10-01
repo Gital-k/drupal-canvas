@@ -251,11 +251,16 @@ export interface DraftServer {
     path: string,
     previewContext?: PreviewContext,
   ): Promise<PageResult | null>;
-  /** Fetches one entity by type and ID, optionally in a specific view mode. */
+  /**
+   * Fetches one entity by type and ID, optionally in a specific view mode.
+   * The language option selects a translation directly, since a type/id
+   * lookup has no routed URL to negotiate a language from.
+   */
   fetchEntity(options: {
     type: string;
     id: string;
     viewMode?: string;
+    language?: string;
     excludeAutoSave?: boolean;
   }): Promise<EntityResult | null>;
   /**

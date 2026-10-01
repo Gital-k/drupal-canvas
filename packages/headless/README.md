@@ -128,6 +128,14 @@ Use `fetchEntity({ type, id, viewMode })` when the current request should render
 one specific content entity in a specific content-template view mode, such as
 `server.fetchEntity({ type: 'node', id: '1', viewMode: 'teaser' })`.
 
+A type/id lookup has no routed URL to negotiate a language from. Pass `language`
+to select a translation directly, such as
+`server.fetchEntity({ type: 'node', id: '1', language: 'fr' })`; Drupal's
+ambient negotiated content language applies when omitted. The result reports
+`negotiatedLanguage` (the language actually rendered) and `translations`,
+sharing the fields and switcher behavior of `mainEntity.translations` returned
+by `getPageData()` from `drupal-canvas`.
+
 Routes that Canvas does not render still return their document-head and route
 data with `content` set to `null` and `route.managedByCanvas` set to `false`. An
 empty managed tree also has `content` set to `null`, but keeps

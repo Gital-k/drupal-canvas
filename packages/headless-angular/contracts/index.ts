@@ -24,6 +24,7 @@ export interface CanvasEntityOptions {
   type: string;
   id: string;
   viewMode?: string;
+  language?: string;
 }
 export function assertCanvasPath(path: string): void {
   if (

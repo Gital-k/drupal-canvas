@@ -160,8 +160,8 @@ requests use fixed same-origin endpoints and cookies, not Drupal bearer tokens.
   navigation.
 - `refresh()`, serialized/coalesced through the shared SDK queue. Refresh waits
   for navigation, preserves renewed session state and follows redirects.
-- `fetchEntity({ type, id, viewMode })` for request-scoped SSR or same-origin
-  browser access.
+- `fetchEntity({ type, id, viewMode, language })` for request-scoped SSR or
+  same-origin browser access.
 
 `CanvasDraftSession` starts the shared session, height and geometry machinery
 after hydration and cleans it up with the application. It exposes `embedded()`

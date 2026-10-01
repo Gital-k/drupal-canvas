@@ -152,5 +152,6 @@ shared `drupal-canvas` client (`createJsonApiClient()`), which deserializes
 responses with `DefaultSerializer`. `getJsonApiRuntimeConfig()` and
 `handleJsonApiProxy()` back the browser client and the proxy route.
 
-`fetchEntity({ type, id, viewMode })` renders one content entity without
-page-level route or head data. Use it for embedded renders such as teaser cards.
+`fetchEntity({ type, id, viewMode, language })` renders one content entity
+without page-level route or head data. Use it for embedded renders such as
+teaser cards.

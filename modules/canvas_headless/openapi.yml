@@ -212,6 +212,13 @@ paths:
           schema:
             type: string
             pattern: '^[a-z0-9_]+$'
+        - name: language
+          in: query
+          required: false
+          description: Selects a translation directly, since a type/id lookup has no routed URL to negotiate a language from. Applies unconditionally, unlike the routed content endpoint's preview-only `language` parameter. Missing translations use Drupal's configured fallback. Omit to use Drupal's ambient negotiated content language, unchanged from prior behavior.
+          schema:
+            type: string
+            pattern: '^[a-zA-Z0-9_-]+$'
         - name: excludeAutoSave
           in: query
           required: false
@@ -239,7 +246,23 @@ paths:
                       bundle: article
                       id: '12'
                       uuid: 773942c6-3660-4c50-9a8d-e25966a69bff
-                      langcode: en
+                      langcode: fr
+                    negotiatedLanguage: fr
+                    translations:
+                      - langcode: en
+                        name: English
+                        nativeName: English
+                        url: https://example.com/node/12
+                        translationAvailable: true
+                        current: false
+                        external: false
+                      - langcode: fr
+                        name: French
+                        nativeName: Français
+                        url: https://example.com/fr/node/12
+                        translationAvailable: true
+                        current: true
+                        external: false
         '400':
           $ref: '#/components/responses/ProblemDetailsResponse'
         '401':
@@ -685,7 +708,7 @@ components:
     CanvasEntityResult:
       type: object
       additionalProperties: false
-      required: [content, managedByCanvas, entity]
+      required: [content, managedByCanvas, entity, negotiatedLanguage, translations]
       properties:
         content:
           oneOf:
@@ -696,6 +719,14 @@ components:
           type: boolean
         entity:
           $ref: '#/components/schemas/RoutedEntityRef'
+        negotiatedLanguage:
+          type: string
+          description: The language actually rendered, entity.langcode's ID. Reflects the `language` query parameter when given and available, otherwise Drupal's ambient negotiated content language.
+        translations:
+          type: array
+          description: Empty on monolingual sites and entities without a canonical link template.
+          items:
+            $ref: '#/components/schemas/RouteTranslation'
 
     UnheadDocument:
       type: object

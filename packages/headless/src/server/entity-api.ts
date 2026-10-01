@@ -23,12 +23,18 @@ import type { EntityResult } from '../entity';
  * access level cannot see (403/404).
  * The request-local excludeAutoSave option excludes Canvas auto-saves while
  * retaining the editor's access permissions.
+ * The language option selects a translation directly: unlike fetchPage, a
+ * type/id lookup has no routed URL to negotiate a language from. Given and
+ * available, it determines both the rendered content and the reported
+ * entity.langcode/negotiatedLanguage; otherwise Drupal's ambient negotiated
+ * content language applies, unchanged from prior behavior.
  */
 export async function fetchEntity(options: {
   baseUrl: string;
   type: string;
   id: string;
   viewMode?: string;
+  language?: string;
   excludeAutoSave?: boolean;
   draftData?: DraftData | null;
   fetchImpl?: typeof fetch;
@@ -38,6 +44,7 @@ export async function fetchEntity(options: {
     type,
     id,
     viewMode,
+    language,
     draftData,
     excludeAutoSave,
     fetchImpl = fetch,
@@ -60,6 +67,9 @@ export async function fetchEntity(options: {
   url.searchParams.set('id', id);
   if (viewMode) {
     url.searchParams.set('viewMode', viewMode);
+  }
+  if (language) {
+    url.searchParams.set('language', language);
   }
   if (liveDraft && excludeAutoSave === true) {
     url.searchParams.set('excludeAutoSave', 'true');
