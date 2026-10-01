@@ -12,7 +12,8 @@ use Symfony\Component\Routing\Route;
  * Provides routes for entities defaulting to Drupal Canvas.
  *
  * Use this class if the add/edit form routes should use Drupal Canvas and
- * not the default entity form system.
+ * not the default entity form system. Add/edit/delete-form routes are
+ * marked as admin routes.
  */
 final class CanvasHtmlRouteProvider extends AdminHtmlRouteProvider {
 
