@@ -279,6 +279,8 @@ When rendering content entities, a content template will be used to render the e
 
 If a `ContentTemplate` is used for rendering a content entity, then `hook_entity_display_build_alter()` will NOT be invoked for that entity, because that hook (and all its implementations) assume field formatters are used to render (all or some) fields in sequence, which is not the case when using Canvas.
 
+Content templates are edited in the Canvas UI. They are also listed in the CMS back end at `/admin/content/templates` (the "Templates" tab next to "Pages"), which can be filtered by label and status and links to the Canvas UI for each template. See `\Drupal\canvas\EntityHandlers\ContentTemplateListBuilder`.
+
 ⚠️ Still to be built:
 - A UI to create content templates, and manage existing templates: https://www.drupal.org/i/3518248
 - Later, when support for exposed slots is added, a second requirement will be added: "The entity is opted into Drupal
