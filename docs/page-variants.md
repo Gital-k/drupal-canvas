@@ -60,6 +60,8 @@ Variants are managed and edited entirely in the editor:
   admin toolbar) still wraps the output. When no variant resolves, enabled
   legacy global regions for the active theme render as a backward-compatibility
   fallback. Core block layout renders the page when no such regions exist.
+  Used without a page variant or legacy regions (for example by Page Manager),
+  the `canvas` display variant renders only the main content.
 - **The default variant** is read and set through
   `/canvas/api/v0/settings/default-page-variant` (the generic config entity API
   cannot write simple config). A staged config update can also change

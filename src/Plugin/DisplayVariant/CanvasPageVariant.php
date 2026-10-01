@@ -37,6 +37,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * prepended to the rendered page body.
  * When no page variant resolves, legacy global regions render for backward
  * compatibility until their migration creates a default page variant.
+ * Without either, only the main content renders, like core's SimplePageVariant
+ * (for example when Page Manager uses this plugin).
  *
  * @see \Drupal\canvas\EventSubscriber\PageVariantSelectorSubscriber::onSelectPageDisplayVariant()
  * @see ::MAIN_CONTENT_REGION
@@ -78,7 +80,7 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
   /**
    * The plugin configuration key whose value is the page variant id to render.
    *
-   * When omitted, the display variant renders legacy global regions.
+   * When omitted, legacy global regions render, if any.
    */
   public const string VARIANT_ID_KEY = 'page_variant';
 
@@ -117,6 +119,16 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
       $container->get(ConfigFactoryInterface::class),
       $container->get(LanguageManagerInterface::class),
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function defaultConfiguration() {
+    return [
+      self::PREVIEW_KEY => FALSE,
+      self::VARIANT_ID_KEY => NULL,
+    ] + parent::defaultConfiguration();
   }
 
   /**
@@ -164,7 +176,11 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
 
     $variant_id = $this->configuration[self::VARIANT_ID_KEY] ?? NULL;
     if ($variant_id === NULL) {
-      $build = $this->buildLegacyPageRegions($is_preview);
+      $regions = PageRegion::loadForActiveTheme();
+      $build = $regions === []
+        ? $this->buildMainContent()
+        : $this->buildLegacyPageRegions($regions, $is_preview);
+      $build['#cache']['tags'][] = 'config:' . PageRegion::ENTITY_TYPE_ID . '_list';
     }
     else {
       \assert(\is_string($variant_id));
@@ -178,7 +194,8 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
     // Both rendering paths depend on the site default selection. A change to
     // it must invalidate the cached page.
     // @see \Drupal\canvas\PageVariantResolver
-    $cacheability = CacheableMetadata::createFromObject($this->configFactory->get('canvas.settings'));
+    $cacheability = CacheableMetadata::createFromRenderArray($build)
+      ->addCacheableDependency($this->configFactory->get('canvas.settings'));
     if ($is_preview) {
       // A preview renders the negotiated language's translation override, so
       // its output varies by interface language. The override itself needs no
@@ -246,15 +263,39 @@ final class CanvasPageVariant extends VariantBase implements PageVariantInterfac
   }
 
   /**
-   * Builds legacy global regions for backward compatibility.
+   * Builds only the messages, title and main content.
+   *
+   * @see \Drupal\Core\Render\Plugin\DisplayVariant\SimplePageVariant::build()
    */
-  private function buildLegacyPageRegions(bool $is_preview): array {
-    $build = [];
+  private function buildMainContent(): array {
+    return [
+      'content' => [
+        'messages' => [
+          '#type' => 'status_messages',
+          '#weight' => -1000,
+          '#include_fallback' => TRUE,
+        ],
+        'page_title' => [
+          '#type' => 'page_title',
+          '#title' => $this->title,
+          '#weight' => -900,
+        ],
+        'main_content' => ['#weight' => -800] + $this->mainContent,
+      ],
+    ];
+  }
 
-    $regions = PageRegion::loadForActiveTheme();
-    if ($regions === []) {
-      throw new \LogicException('The active theme has no enabled PageRegion entities.');
-    }
+  /**
+   * Builds legacy global regions for backward compatibility.
+   *
+   * @param \Drupal\canvas\Entity\PageRegion[] $regions
+   *   The active theme's enabled legacy global regions.
+   * @param bool $is_preview
+   *   Whether to render auto-saved drafts.
+   */
+  private function buildLegacyPageRegions(array $regions, bool $is_preview): array {
+    \assert($regions !== []);
+    $build = [];
 
     \assert(!empty($this->title));
     \assert(!empty($this->mainContent));
