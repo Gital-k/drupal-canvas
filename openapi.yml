@@ -418,25 +418,17 @@ paths:
                 - name
                 - machineName
                 - status
-                - required
-                - props
-                - slots
-                - dataDependencies
             examples:
               minimal component:
                 value:
                   machineName: example
                   name: Example
                   status: true
-                  required: []
-                  props: {}
-                  slots: {}
                   sourceCodeJs: 'export default function Example() {}'
                   sourceCodeCss: ''
                   compiledJs: 'export default function Example() {}'
                   compiledCss: ''
                   importedJsComponents: []
-                  dataDependencies: {}
       responses:
         '204':
           description: The target site accepts the payload metadata.
@@ -1136,17 +1128,17 @@ paths:
               $ref: '#/components/schemas/NewCodeComponent'
             examples:
               a simple js component with no slots or props, and no imports:
-                machineName: test_component
-                name: Test Component
-                status: FALSE
-                props: []
-                slots: []
-                sourceCodeJs: 'console.log("Test");'
-                sourceCodeCss: '.test{ display:none; }'
-                compiledJs: 'console.log("Test");'
-                compiledCss: '.test{display:none;}'
-                importedJsComponents: []
-                dataDependencies: []
+                # `props`, `slots`, `required` and `dataDependencies` are
+                # omitted rather than sent empty.
+                value:
+                  machineName: test_component
+                  name: Test Component
+                  status: false
+                  sourceCodeJs: 'console.log("Test");'
+                  sourceCodeCss: '.test{ display:none; }'
+                  compiledJs: 'console.log("Test");'
+                  compiledCss: '.test{display:none;}'
+                  importedJsComponents: []
       responses:
         '201':
           description: Successful creation of individual Code Component
@@ -4455,14 +4447,17 @@ components:
           description: Human-readable code component label
         required:
           type: array
+          description: The names of the required props. May be omitted when there are none.
           items:
             type: string
         props:
           type: object
+          description: The prop definitions. May be omitted when there are none.
           # @todo Uncomment this in a follow-up MR in https://www.drupal.org/i/3503377
           # $ref: 'https://json-schema.org/draft-04/schema'
         slots:
           type: object
+          description: The slot definitions. May be omitted when there are none.
           additionalProperties:
             type: object
             required:
@@ -4494,6 +4489,13 @@ components:
           type: string
         dataDependencies:
           type: object
+          # Each key must be omitted when it has no entries, because the config
+          # schema constrains them to be `NotBlank`. Clients need not make that
+          # distinction: an empty value is accepted and stored as an omitted one.
+          # The same applies to `dataDependencies` itself, and to a slot
+          # definition's `description` and `examples`.
+          # @see \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide()
+          description: The data this Code Component depends on. May be omitted when there is none.
           schema:
             urls:
               type: array
@@ -4567,11 +4569,15 @@ components:
     NewCodeComponent:
       allOf:
         - $ref: '#/components/schemas/UpdatedCodeComponent'
+      # Every other property may be omitted; the server applies the same
+      # default it would store for an empty value. `status` stays required
+      # because omitting it would publish the Code Component to the component
+      # library, which is rarely what the creator of a new one intends.
+      # @see \Drupal\canvas\Entity\JavaScriptComponent::createFromClientSide()
       required:
         - name
         - machineName
         - status
-        - dataDependencies
       # @todo Sending `links` in PATCH & POST requests should be reported as invalid by OpenAPI validation, but it isn't today.
       # @see https://github.com/thephpleague/openapi-psr7-validator/issues/124#issuecomment-1483323527
       # @see https://github.com/thephpleague/openapi-psr7-validator/issues/163#issuecomment-2359233087

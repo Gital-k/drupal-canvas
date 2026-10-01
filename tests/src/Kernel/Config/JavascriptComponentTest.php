@@ -9,6 +9,7 @@ use Drupal\canvas\Entity\JavaScriptComponent;
 use Drupal\canvas\Exception\ConstraintViolationException;
 use Drupal\Tests\canvas\Kernel\CanvasKernelTestBase;
 use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 
@@ -19,6 +20,189 @@ use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
 #[CoversClass(JavaScriptComponent::class)]
 #[Group('canvas')]
 class JavascriptComponentTest extends CanvasKernelTestBase {
+
+  /**
+   * A valid `react` Code Component payload, with every optional key sent.
+   *
+   * @return array<string, mixed>
+   */
+  private static function clientData(): array {
+    return [
+      'machineName' => 'test_optional',
+      'name' => 'Test optional properties',
+      'status' => FALSE,
+      'required' => [],
+      'props' => [],
+      'slots' => [],
+      'sourceCodeJs' => 'export default function Test() {}',
+      'sourceCodeCss' => '',
+      'compiledJs' => 'export default function Test() {}',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+      'dataDependencies' => [],
+    ];
+  }
+
+  /**
+   * Tests that omitted properties are accepted and get the canonical default.
+   *
+   * Config schema requires `dataDependencies` to be present, but a Code
+   * Component that depends on no data has nothing to send. The HTTP API
+   * therefore accepts its absence and stores the canonical empty value.
+   *
+   * `status`, `type`, `required`, `props` and `slots` were already optional;
+   * they are asserted here to lock that in, because openapi.yml now advertises
+   * them as optional.
+   *
+   * @see https://www.drupal.org/i/3553427
+   *
+   * @legacy-covers ::createFromClientSide
+   */
+  public function testOmittedPropertiesAreAccepted(): void {
+    $client_data = self::clientData();
+    foreach (['dataDependencies', 'status', 'type', 'required', 'props', 'slots'] as $omitted_key) {
+      unset($client_data[$omitted_key]);
+    }
+
+    $component = JavaScriptComponent::createFromClientSide($client_data);
+
+    // The canonical empty value, matching what CanvasConfigUpdater back-fills.
+    // @see \Drupal\canvas\CanvasConfigUpdater::updateDataDependencies()
+    $this->assertSame([], $component->get('dataDependencies'));
+    // Flexibility on the wire must not loosen config validity.
+    self::assertEntityIsValid($component);
+  }
+
+  /**
+   * Tests that empty values are normalized to omitted ones.
+   *
+   * Config schema marks these keys `requiredKey: false` *and* `NotBlank`: they
+   * must be absent rather than empty. Clients should not have to make that
+   * distinction, so the server drops empty values instead of rejecting them.
+   *
+   * @see https://www.drupal.org/i/3553427
+   *
+   * @legacy-covers ::createFromClientSide
+   * @legacy-covers ::updateFromClientSide
+   */
+  public function testEmptyValuesAreNormalizedToOmittedOnes(): void {
+    $client_data = self::clientData();
+    $client_data['dataDependencies'] = [
+      'urls' => [],
+      'drupalSettings' => [],
+      'entityFields' => [],
+    ];
+    $client_data['slots'] = [
+      'the-slot' => [
+        'title' => 'The slot',
+        'description' => '',
+        'examples' => [],
+      ],
+    ];
+
+    $component = JavaScriptComponent::createFromClientSide($client_data);
+
+    $this->assertSame([], $component->get('dataDependencies'));
+    $this->assertSame(['the-slot' => ['title' => 'The slot']], $component->get('slots'));
+    self::assertEntityIsValid($component);
+
+    // Non-empty values are untouched.
+    $client_data['dataDependencies']['drupalSettings'] = ['v0.pageTitle'];
+    $client_data['slots']['the-slot']['description'] = 'A description.';
+    $component->updateFromClientSide($client_data);
+    $this->assertSame(['drupalSettings' => ['v0.pageTitle']], $component->get('dataDependencies'));
+    $this->assertSame([
+      'the-slot' => [
+        'title' => 'The slot',
+        'description' => 'A description.',
+      ],
+    ], $component->get('slots'));
+    self::assertEntityIsValid($component);
+
+    // Emptying a previously set value still clears it.
+    $client_data['dataDependencies']['drupalSettings'] = [];
+    $component->updateFromClientSide($client_data);
+    $this->assertSame([], $component->get('dataDependencies'));
+    self::assertEntityIsValid($component);
+  }
+
+  /**
+   * Tests that omitting a key in a PATCH payload leaves the stored value alone.
+   *
+   * Normalizing empty values must not turn ::updateFromClientSide() into a full
+   * replacement: absent keys still mean "unchanged".
+   *
+   * @see https://www.drupal.org/i/3553427
+   *
+   * @legacy-covers ::updateFromClientSide
+   */
+  public function testOmittedPropertiesArePreservedOnUpdate(): void {
+    $client_data = self::clientData();
+    $client_data['dataDependencies'] = ['drupalSettings' => ['v0.pageTitle']];
+    $component = JavaScriptComponent::createFromClientSide($client_data);
+
+    $component->updateFromClientSide(['name' => 'Renamed']);
+
+    $this->assertSame('Renamed', $component->get('name'));
+    $this->assertSame(['drupalSettings' => ['v0.pageTitle']], $component->get('dataDependencies'));
+    self::assertEntityIsValid($component);
+  }
+
+  /**
+   * Tests the empty values that deliberately remain validation errors.
+   *
+   * An empty value is normalized to an omitted one only where omitting is
+   * valid. Where it is not, the client gets a validation error rather than a
+   * silently different Code Component.
+   *
+   * @param array<string, mixed> $override
+   *   The client-side payload keys to override.
+   * @param array<string, string> $expected_errors
+   *   The expected validation errors, keyed by property path.
+   *
+   * @see https://www.drupal.org/i/3553427
+   *
+   * @legacy-covers ::createFromClientSide
+   */
+  #[DataProvider('providerEmptyValuesThatRemainInvalid')]
+  public function testEmptyValuesThatRemainInvalid(array $override, array $expected_errors): void {
+    $component = JavaScriptComponent::createFromClientSide($override + self::clientData());
+
+    $actual_errors = [];
+    foreach ($component->getTypedData()->validate() as $violation) {
+      $actual_errors[$violation->getPropertyPath()] = (string) $violation->getMessage();
+    }
+    $this->assertSame($expected_errors, $actual_errors);
+  }
+
+  /**
+   * @return iterable<string, array{array<string, mixed>, array<string, string>}>
+   */
+  public static function providerEmptyValuesThatRemainInvalid(): iterable {
+    // `name` is the component's label: a Code Component must have one.
+    yield 'empty name' => [
+      ['name' => ''],
+      ['name' => 'This value should not be blank.'],
+    ];
+    // `type` may be omitted, but an empty string is not one of its choices.
+    // Omitting it means `react`.
+    yield 'empty type' => [
+      ['type' => ''],
+      ['type' => 'The value you selected is not a valid choice.'],
+    ];
+    // A slot's `title` is required, so an empty one is reported as blank rather
+    // than dropped the way its optional siblings are.
+    yield 'empty slot title' => [
+      ['slots' => ['the-slot' => ['title' => '', 'description' => '', 'examples' => []]]],
+      ['slots.the-slot.title' => 'This value should not be blank.'],
+    ];
+    // An unsupported key sent empty still gets the error naming it, instead of
+    // being silently dropped.
+    yield 'unsupported dataDependencies key' => [
+      ['dataDependencies' => ['unsupported' => []]],
+      ['dataDependencies.unsupported' => "'unsupported' is not a supported key."],
+    ];
+  }
 
   /**
    * Tests minItems enforcement in updateFromClientSide.

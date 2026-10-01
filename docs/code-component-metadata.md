@@ -31,6 +31,29 @@ Canvas CLI validates the raw YAML before applying defaults. It rejects unknown k
 `canvas pull` omits projected keys, preserves `dataDependencies.entityFields`, and writes the optional authored fields
 explicitly.
 
+## HTTP API payloads
+
+The Code Component HTTP endpoints (`POST` and `PATCH` on `/canvas/api/v0/config/js_component`, and
+`/canvas/api/v0/code-components/validate`) accept a looser payload than the config schema stores. A client may omit a
+property, or send it empty; the server normalizes both to the single value the config schema requires. Clients therefore
+never have to distinguish "omitted" from "empty".
+
+Required on create: `machineName`, `name`, and `status`. `status` is required because omitting it would publish the Code
+Component to the component library. The four code properties — `sourceCodeJs`, `sourceCodeCss`, `compiledJs` and
+`compiledCss` — are required for every component except an `external` one, which has no source code in Canvas.
+
+Optional, and accepted empty: `type` (an omitted value means `react`), `required`, `props`, `slots`,
+`dataDependencies`, each of `dataDependencies.urls`, `dataDependencies.drupalSettings` and
+`dataDependencies.entityFields`, and a slot definition's `description` and `examples`.
+
+Two empty values remain validation errors, because omitting them is not equivalent to sending them empty:
+
+- `type: ''` is not one of its choices — omit it to get `react`; and
+- an empty `enum` on a prop leaves that prop with no valid value at all.
+
+In a `PATCH` payload an omitted property still means "leave unchanged", so emptying a stored value requires sending it
+empty.
+
 ## Local and target validation
 
 The CLI uses the bundled schema to validate the authored envelope. It also checks each prop definition as JSON Schema and

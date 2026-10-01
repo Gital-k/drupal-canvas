@@ -1082,6 +1082,124 @@ class CanvasConfigEntityHttpApiTest extends HttpApiTestBase {
   }
 
   /**
+   * Tests that a client may omit Code Component properties, or send them empty.
+   *
+   * The config schema is strict: `dataDependencies` must be present, each of
+   * its keys must be absent rather than empty, and so must a slot definition's
+   * `description`. The HTTP API is deliberately more flexible — it accepts both
+   * an omitted and an empty value — and the server normalizes to whatever the
+   * config schema demands.
+   *
+   * @see https://www.drupal.org/i/3553427
+   * @see \Drupal\canvas\Entity\JavaScriptComponent::createFromClientSide()
+   * @see \Drupal\canvas\Entity\JavaScriptComponent::updateFromClientSide()
+   */
+  public function testJavaScriptComponentOptionalProperties(): void {
+    $this->drupalLogin($this->httpApiUser);
+    $list_url = Url::fromUri('base:/canvas/api/v0/config/js_component');
+    $request_options = [
+      RequestOptions::HEADERS => [
+        'Content-Type' => 'application/json',
+        'X-CSRF-Token' => $this->drupalGet('session/token'),
+      ],
+    ];
+
+    // `dataDependencies`, `type`, `required`, `props` and `slots` are all
+    // omitted: this is the smallest payload that creates a Code Component.
+    $request_options[RequestOptions::JSON] = [
+      'machineName' => 'omitted',
+      'name' => 'Omitted',
+      'status' => FALSE,
+      'sourceCodeJs' => 'export default function Omitted() {}',
+      'sourceCodeCss' => '',
+      'compiledJs' => 'export default function Omitted() {}',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    $body = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'omitted', []);
+    self::assertSame([
+      'machineName' => 'omitted',
+      'name' => 'Omitted',
+      'status' => FALSE,
+      'props' => [],
+      'required' => [],
+      'slots' => [],
+      'sourceCodeJs' => 'export default function Omitted() {}',
+      'sourceCodeCss' => '',
+      'compiledJs' => 'export default function Omitted() {}',
+      'compiledCss' => '',
+      'dataDependencies' => [],
+      'links' => [
+        'delete-form' => \base_path() . 'canvas/api/v0/config/js_component/omitted',
+      ],
+    ], $body);
+    self::assertSame([], self::loadValidatedJavaScriptComponent('omitted')->get('dataDependencies'));
+
+    // The same properties sent empty rather than omitted, plus a slot whose
+    // optional keys are empty: accepted, and normalized to the above.
+    $request_options[RequestOptions::JSON] = [
+      'machineName' => 'emptied',
+      'name' => 'Emptied',
+      'status' => FALSE,
+      'required' => [],
+      'props' => [],
+      'slots' => [
+        'the-slot' => [
+          'title' => 'The slot',
+          'description' => '',
+          'examples' => [],
+        ],
+      ],
+      'sourceCodeJs' => 'export default function Emptied() {}',
+      'sourceCodeCss' => '',
+      'compiledJs' => 'export default function Emptied() {}',
+      'compiledCss' => '',
+      'importedJsComponents' => [],
+      'dataDependencies' => [
+        'urls' => [],
+        'drupalSettings' => [],
+        'entityFields' => [],
+      ],
+    ];
+    $body = $this->assertExpectedResponse('POST', $list_url, $request_options, 201, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    $body = self::assertPreviewForJavaScriptComponentIsPresentThenOmit($body, 'emptied', []);
+    self::assertSame([], $body['dataDependencies']);
+    self::assertSame(['the-slot' => ['title' => 'The slot']], $body['slots']);
+    $component = self::loadValidatedJavaScriptComponent('emptied');
+    self::assertSame([], $component->get('dataDependencies'));
+    self::assertSame(['the-slot' => ['title' => 'The slot']], $component->get('slots'));
+
+    // Omitting a property in a PATCH still means "leave it unchanged".
+    $canonical_url = Url::fromUri('base:/canvas/api/v0/config/js_component/emptied');
+    $request_options[RequestOptions::JSON] = [
+      'dataDependencies' => ['drupalSettings' => ['v0.pageTitle']],
+    ];
+    $this->assertExpectedResponse('PATCH', $canonical_url, $request_options, 200, NULL, NULL, NULL, NULL);
+    $request_options[RequestOptions::JSON] = ['name' => 'Renamed'];
+    $body = $this->assertExpectedResponse('PATCH', $canonical_url, $request_options, 200, NULL, NULL, NULL, NULL);
+    self::assertIsArray($body);
+    self::assertSame('Renamed', $body['name']);
+    self::assertSame(['drupalSettings' => ['v0.pageTitle']], $body['dataDependencies']);
+    self::assertSame(['drupalSettings' => ['v0.pageTitle']], self::loadValidatedJavaScriptComponent('emptied')->get('dataDependencies'));
+  }
+
+  /**
+   * Loads a Code Component and asserts it is valid against its config schema.
+   *
+   * Accepting looser payloads on the HTTP API must never result in stored
+   * config that the strict config schema rejects.
+   */
+  private static function loadValidatedJavaScriptComponent(string $id): JavaScriptComponent {
+    $component = JavaScriptComponent::load($id);
+    self::assertInstanceOf(JavaScriptComponent::class, $component);
+    self::assertCount(0, $component->getTypedData()->validate());
+    return $component;
+  }
+
+  /**
    * @see \Drupal\canvas\Entity\JavaScriptComponent
    */
   public function testJavaScriptComponent(): void {
