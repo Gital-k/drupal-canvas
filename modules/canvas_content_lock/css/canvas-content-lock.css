@@ -1,0 +1,84 @@
+/**
+ * @file
+ * Styles for the Canvas content lock dialog.
+ */
+
+.canvas-content-lock {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(0, 0, 0, 0.5);
+  inset: 0;
+}
+
+.canvas-content-lock__dialog {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  color: #1c2024;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgb(0, 0, 0, 0.25);
+  font-family: system-ui, sans-serif;
+}
+
+.canvas-content-lock__title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.canvas-content-lock__message {
+  margin: 0 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.canvas-content-lock__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.canvas-content-lock__button {
+  padding: 8px 14px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.canvas-content-lock__button--primary {
+  color: #fff;
+  background: #3e63dd;
+}
+
+.canvas-content-lock__button--secondary {
+  color: #1c2024;
+  border-color: #cdced6;
+  background: transparent;
+}
+
+.canvas-content-lock__button:focus-visible {
+  outline: 2px solid #3e63dd;
+  outline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .canvas-content-lock__dialog {
+    color: #edeef0;
+    background: #18191b;
+  }
+
+  .canvas-content-lock__button--secondary {
+    color: #edeef0;
+    border-color: #43484e;
+  }
+}

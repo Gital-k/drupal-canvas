@@ -1,0 +1,4 @@
+break canvas content lock:
+  title: 'Break Canvas content locks'
+  description: 'Take over editing of a Canvas page that another user is editing.'
+  restrict access: true

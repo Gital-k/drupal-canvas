@@ -1,0 +1,6 @@
+services:
+  _defaults:
+    autoconfigure: true
+    autowire: true
+  Drupal\canvas_content_lock\ContentLockManager: {}
+  Drupal\canvas_content_lock\EventSubscriber\ContentLockAssetsSubscriber: {}
