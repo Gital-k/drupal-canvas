@@ -349,7 +349,18 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public static function createFromClientSide(array $data): static {
-    $entity = static::create(['machineName' => $data['machineName']]);
+    // `dataDependencies` may be omitted: a Code Component that depends on no
+    // data has nothing to send. Config schema does require the key, so seed the
+    // canonical empty value here; ::updateFromClientSide() overwrites it when
+    // the client does send one.
+    // TRICKY: this must not become a class property default, because
+    // \Drupal\canvas\CanvasConfigUpdater::needsDataDependenciesUpdate() detects
+    // config entities predating `dataDependencies` by that property being NULL.
+    // @see \Drupal\canvas\CanvasConfigUpdater::needsDataDependenciesUpdate()
+    $entity = static::create([
+      'machineName' => $data['machineName'],
+      'dataDependencies' => [],
+    ]);
     $entity->updateFromClientSide($data);
     return $entity;
   }
@@ -359,6 +370,12 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
    *
    * This corresponds to `CodeComponent` in openapi.yml.
    *
+   * Keys absent from $data are left untouched, which is what makes PATCH a
+   * partial update. Keys the client sends empty are normalized to "absent"
+   * where config schema marks them `requiredKey: false`, so a client never has
+   * to distinguish "omitted" from "empty".
+   *
+   * @see ::dropEmptyValues()
    * @see docs/adr/0005-Keep-the-front-end-simple.md
    */
   public function updateFromClientSide(array $data): void {
@@ -370,7 +387,20 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
     // Code Component Developer picks in the UI, this coalesces them as needed.
     // @see \Drupal\canvas\Plugin\Validation\Constraint\EntityFieldExpressionsSameFieldMustBeCoalescedConstraint
     if (isset($data['dataDependencies']) && \is_array($data['dataDependencies'])) {
+      $data['dataDependencies'] = self::dropEmptyValues($data['dataDependencies'], [
+        'urls',
+        'drupalSettings',
+        'entityFields',
+      ]);
       $data['dataDependencies'] = self::coalesceEntityFields($data['dataDependencies']);
+    }
+    if (isset($data['slots']) && \is_array($data['slots'])) {
+      // Same for every slot definition's optional keys.
+      // @see `type: canvas.slot_definition` in canvas.schema.yml
+      $data['slots'] = \array_map(
+        static fn (mixed $slot): mixed => \is_array($slot) ? self::dropEmptyValues($slot, ['description', 'examples']) : $slot,
+        $data['slots'],
+      );
     }
     foreach (array_intersect_key($data, array_flip([
       'machineName',
@@ -512,6 +542,38 @@ final class JavaScriptComponent extends ConfigEntityBase implements CanvasAssetI
       $entity_field_expressions[] = $expression;
     }
     return Coalescer::coalesce($entity_field_expressions);
+  }
+
+  /**
+   * Drops the given keys when the client sent them with an empty value.
+   *
+   * Config schema marks these keys `requiredKey: false` and additionally
+   * constrains them to be `NotBlank`: each must be omitted rather than set to
+   * an empty value. Clients should not have to make that distinction, so accept
+   * empty values on the HTTP API and omit them here instead.
+   *
+   * @param array<string, mixed> $values
+   *   The key-value pairs received from the client side.
+   * @param list<string> $optional_keys
+   *   The keys config schema allows to be absent. Every other key is left as
+   *   sent, so that a required key sent empty, or an unsupported key, still
+   *   gets the validation error that describes it.
+   *
+   * @return array<string, mixed>
+   *   The same pairs, minus the optional ones whose value is empty.
+   *
+   * @see https://www.drupal.org/i/3553427
+   */
+  private static function dropEmptyValues(array $values, array $optional_keys): array {
+    return \array_filter(
+      $values,
+      // TRICKY: `0`, `0.0` and `FALSE` are meaningful values, so this
+      // deliberately does not use `empty()`. JSON `{}`, `[]` and `null` all
+      // convey "nothing", and `''` does so for the string-typed keys.
+      static fn (mixed $value, string $key): bool => !\in_array($key, $optional_keys, TRUE)
+        || ($value !== [] && $value !== NULL && $value !== ''),
+      \ARRAY_FILTER_USE_BOTH,
+    );
   }
 
   /**
