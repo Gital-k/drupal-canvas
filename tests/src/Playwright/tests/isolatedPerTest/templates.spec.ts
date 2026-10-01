@@ -42,14 +42,9 @@ test.describe('Templates - General', () => {
     await canvas.openCanvasRoot();
     await canvas.openTemplatesPanel();
 
-    await expect(
-      page.locator('[data-canvas-folder-name="Article"]'),
-    ).toBeVisible();
     await expect(page.locator('.primaryPanelContent')).toMatchAriaSnapshot(`
-      - button "Content types" [expanded]
-      - region "Content types":
-        - button "New content template":
-          - img
+      - button "New content template":
+        - img
       - button "Page templates" [expanded]
       - region "Page templates"
     `);
@@ -513,6 +508,38 @@ test.describe('Templates - General', () => {
     // Verify the Hero component renders with article title.
     await expect(page.locator('.my-hero__heading')).toBeVisible();
     await expect(page.locator('.my-hero__heading')).toHaveCount(1);
+  });
+
+  test('Template - add template dialog shows entity type dropdown with multiple entity types', async ({
+    page,
+    drupal,
+    canvas,
+  }) => {
+    await drupal.loginAsAdmin();
+    await canvas.openCanvasRoot();
+    await page.click('[aria-label="Templates"]');
+
+    await page.getByTestId('big-add-template-button').click();
+    await expect(
+      page.getByTestId('canvas-manage-library-add-template-content'),
+    ).toBeVisible();
+
+    // The entity type dropdown must be present.
+    await expect(page.locator('#entity-type')).toBeVisible();
+
+    // Open the entity type dropdown and verify options.
+    await page.locator('#entity-type').click();
+
+    // "Content" (node) must be available.
+    await expect(page.getByRole('option', { name: 'Content' })).toBeVisible();
+
+    // At least one additional entity type must appear (e.g. Taxonomy term).
+    const options = page.getByRole('option');
+    expect(await options.count()).toBeGreaterThan(1);
+
+    // Select "Content" and verify the content type dropdown becomes enabled.
+    await page.getByRole('option', { name: 'Content' }).click();
+    await expect(page.locator('#content-type')).toBeEnabled();
   });
 });
 

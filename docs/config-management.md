@@ -275,7 +275,9 @@ A `ContentTemplate` config entity can be created by Ambitious Site Builders to a
 When rendering content entities, a content template will be used to render the entity if, and _only_ if, two things are true:
 
 1. There is a `ContentTemplate` for that content entity type and bundle, in the view mode that is being rendered.
-2. The content entity type is `Node`.
+2. The content entity type declares a `field_ui_base_route` (which is what Field UI uses to decide whether it offers a "Manage display" UI), and is not itself a Canvas component tree entity type (`Page`).
+
+Which content entity types can be _edited_ in Canvas is a separate question, tracked in https://www.drupal.org/i/3498525.
 
 If a `ContentTemplate` is used for rendering a content entity, then `hook_entity_display_build_alter()` will NOT be invoked for that entity, because that hook (and all its implementations) assume field formatters are used to render (all or some) fields in sequence, which is not the case when using Canvas.
 
@@ -283,7 +285,6 @@ If a `ContentTemplate` is used for rendering a content entity, then `hook_entity
 - A UI to create content templates, and manage existing templates: https://www.drupal.org/i/3518248
 - Later, when support for exposed slots is added, a second requirement will be added: "The entity is opted into Drupal
 Canvas, which means it has an `Canvas field`."
-- Later, after https://www.drupal.org/i/3498525, remove the second requirement: support more than just `Node`.
 
 ### 3.6 `StagedConfigUpdate` config entity
 

@@ -790,7 +790,7 @@ export const componentAndLayoutApi = createApi({
       providesTags: () => [{ type: 'ContentTemplates', id: 'LIST' }],
     }),
     getViewModes: builder.query<ViewModesList, void>({
-      query: () => `canvas/api/v0/ui/content_template/view_modes/node`,
+      query: () => `canvas/api/v0/ui/content_template/view_modes`,
       providesTags: () => [{ type: 'ViewModes', id: 'LIST' }],
     }),
     getPreviewContentEntities: builder.query<
