@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useReducer } from 'react';
+import { useEffect, useMemo, useReducer, useRef } from 'react';
 import parse from 'html-react-parser';
 import { Cross2Icon } from '@radix-ui/react-icons';
 import * as Popover from '@radix-ui/react-popover';
@@ -230,24 +230,49 @@ const ColorFormPopover = ({
     isColorValueValid,
   } = formState;
 
-  // Reset mutations when popover opens/closes
+  // Set while a rejection is reopening this form, so the opening below keeps
+  // the entered values and the error instead of starting over.
+  const isRetryRef = useRef(false);
+  const isOpenedRef = useRef(false);
+  // Mark closes triggered by Save so we don't treat them like user dismissals.
+  const isSavingCloseRef = useRef(false);
+
+  // Initialize once per open cycle so optimistic cache updates do not
+  // overwrite retry values after a failed save.
   useEffect(() => {
     if (!open) {
-      resetCreate();
-      resetUpdate();
-    }
-  }, [open, resetCreate, resetUpdate]);
-
-  // Initialize form when opening
-  useEffect(() => {
-    if (open) {
-      if (operation === 'edit' && color) {
-        updateForm({ type: 'INIT_EDIT', color });
-      } else {
-        updateForm({ type: 'INIT_ADD' });
+      isOpenedRef.current = false;
+      // If the user truly closes the popover, clear any old mutation state so
+      // the next open starts clean.
+      if (!isSavingCloseRef.current) {
+        resetCreate();
+        resetUpdate();
       }
+      isSavingCloseRef.current = false;
+      return;
     }
-  }, [open, operation, color]);
+    if (isOpenedRef.current) {
+      return;
+    }
+    isOpenedRef.current = true;
+    if (isRetryRef.current) {
+      isRetryRef.current = false;
+      return;
+    }
+    resetCreate();
+    resetUpdate();
+    if (operation === 'edit' && color) {
+      updateForm({ type: 'INIT_EDIT', color });
+    } else {
+      updateForm({ type: 'INIT_ADD' });
+    }
+  }, [open, operation, color, resetCreate, resetUpdate]);
+
+  /** Reopens this form on what was entered, to show why the save failed. */
+  const reopenOnFailure = () => {
+    isRetryRef.current = true;
+    onOpenChange(true);
+  };
 
   const handleVariableNameChange = (value: string) => {
     updateForm({ type: 'SET_VARIABLE_NAME', value });
@@ -287,6 +312,11 @@ const ColorFormPopover = ({
 
     const cssVariable = `--${variableName.startsWith('--') ? variableName.slice(2) : variableName}`;
 
+    // Close right away because the optimistic update already updated the list.
+    // Mark this as a save-driven close so we keep the current request state;
+    isSavingCloseRef.current = true;
+    onOpenChange(false);
+
     try {
       if (operation === 'add') {
         const newColor = await createColor({
@@ -316,7 +346,7 @@ const ColorFormPopover = ({
                 error:
                   'The color was created but could not be added to the folder. You can move it manually.',
               });
-              // Keep the popover open so the user sees the error.
+              reopenOnFailure();
               return;
             }
           }
@@ -331,10 +361,9 @@ const ColorFormPopover = ({
           },
         }).unwrap();
       }
-
-      onOpenChange(false);
     } catch (err) {
       console.error('Failed to save color:', err);
+      reopenOnFailure();
     }
   };
 
