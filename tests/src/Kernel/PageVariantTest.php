@@ -751,11 +751,22 @@ final class PageVariantTest extends CanvasKernelTestBase {
     // The page body renders through the bare variant template.
     self::assertSame('canvas_page_variant', $build['#theme']);
 
-    // The route's main content is injected where the marker sits.
+    // The route's main content is injected where the marker sits. Render the
+    // whole build, not just #content, so the #main-content anchor #post_render
+    // callback runs.
+    // @see \Drupal\canvas\Plugin\DisplayVariant\CanvasPageVariant::resolveMainContentAnchor()
     $renderer = $this->container->get(RendererInterface::class);
     self::assertInstanceOf(RendererInterface::class, $renderer);
-    $html = (string) $renderer->renderInIsolation($build['#content']);
+    $html = (string) $renderer->renderInIsolation($build);
     self::assertStringContainsString($sentinel, $html);
+
+    // This variant has no theme page template, so nothing else provides the
+    // anchor: the callback inserts it, before the injected content, so the
+    // theme's "Skip to main content" link (in html.html.twig) has a target.
+    // @see core/modules/system/templates/html.html.twig
+    $anchor = '<a id="main-content" tabindex="-1"></a>';
+    self::assertStringContainsString($anchor, $html);
+    self::assertLessThan(\strpos($html, $sentinel), \strpos($html, $anchor));
   }
 
   /**
