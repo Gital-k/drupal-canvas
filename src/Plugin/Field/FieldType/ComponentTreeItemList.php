@@ -362,6 +362,16 @@ final class ComponentTreeItemList extends FieldItemList implements RenderableInt
           throw $e;
         }
         catch (\Throwable $e) {
+          // Check if this exception wraps a FormAjaxException or
+          // EnforcedResponseException.
+          // When these exceptions are thrown during inline template
+          // rendering, Twig wraps them in RuntimeError. We need to unwrap
+          // and rethrow them to allow Ajax form submissions to work
+          // correctly in component slots.
+          $previous = $e->getPrevious();
+          if ($previous instanceof EnforcedResponseException || $previous instanceof FormAjaxException) {
+            throw $previous;
+          }
           // @todo Remove all the wrapping-in-RenderSafeComponentContainer complexity and make ComponentSourceInterface::renderComponent() for that instead in https://www.drupal.org/i/3521041
           $build[$component_subtree_uuid][$component_instance_uuid] = RenderSafeComponentContainer::handleComponentException(
             $e,
