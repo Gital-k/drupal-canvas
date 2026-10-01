@@ -807,6 +807,32 @@ final class PageVariantTest extends CanvasKernelTestBase {
   }
 
   /**
+   * Tests the display variant without configuration nor legacy regions.
+   *
+   * @see https://git.drupalcode.org/project/canvas/-/work_items/3592141
+   */
+  public function testDisplayVariantWithoutConfigurationRendersMainContent(): void {
+    self::assertNull($this->config('canvas.settings')->get(PageVariant::DEFAULT_SETTING));
+    self::assertSame([], PageRegion::loadForActiveTheme());
+
+    $variant_manager = $this->container->get('plugin.manager.display_variant');
+    self::assertInstanceOf(VariantManager::class, $variant_manager);
+    $plugin = $variant_manager->createInstance(CanvasPageVariant::PLUGIN_ID);
+    self::assertInstanceOf(CanvasPageVariant::class, $plugin);
+    $plugin->setMainContent(['#markup' => 'Route main content']);
+    $plugin->setTitle('Rendered title');
+    $build = $plugin->build();
+
+    self::assertArrayNotHasKey('#theme', $build);
+    self::assertContains('config:page_region_list', $build['#cache']['tags']);
+    $renderer = $this->container->get(RendererInterface::class);
+    self::assertInstanceOf(RendererInterface::class, $renderer);
+    $html = (string) $renderer->renderInIsolation($build);
+    self::assertStringContainsString('Rendered title', $html);
+    self::assertStringContainsString('Route main content', $html);
+  }
+
+  /**
    * Tests the marker's placeholder when the variant tree itself is previewed.
    *
    * When a page variant is edited in Canvas, its tree renders as the preview's
